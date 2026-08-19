@@ -1,14 +1,11 @@
 """DeepSeek 模型适配器（OpenAI 兼容接口）。
 
-阶段0只实现最小连通性检查：
-- 使用配置的 base URL + model ID + API Key 发起一次 chat/completions 请求
-- 绝不修改 model ID，绝不猜测或替换
-- 所有错误信息经过脱敏，不包含 API Key
+所有对外暴露的错误信息都经过脱敏，不包含 API Key。
 """
 import httpx
 
 from app.core.logging import sanitize_text
-from app.infrastructure.llm.base import ModelAdapter, ModelCheckResult
+from app.infrastructure.llm.base import ModelAdapter, ModelCheckResult, ModelError
 
 
 class DeepSeekAdapter(ModelAdapter):
@@ -18,6 +15,12 @@ class DeepSeekAdapter(ModelAdapter):
 
             settings = get_settings()
         self.settings = settings
+
+    def _headers(self) -> dict:
+        return {
+            "Authorization": f"Bearer {self.settings.deepseek_api_key}",
+            "Content-Type": "application/json",
+        }
 
     def check_connectivity(self) -> ModelCheckResult:
         s = self.settings
@@ -39,14 +42,10 @@ class DeepSeekAdapter(ModelAdapter):
             "max_tokens": 5,
             "stream": False,
         }
-        headers = {
-            "Authorization": f"Bearer {secret}",
-            "Content-Type": "application/json",
-        }
 
         try:
             with httpx.Client(timeout=s.model_request_timeout_seconds) as client:
-                resp = client.post(url, json=payload, headers=headers)
+                resp = client.post(url, json=payload, headers=self._headers())
         except httpx.HTTPError as exc:
             return ModelCheckResult(
                 success=False,
@@ -63,7 +62,6 @@ class DeepSeekAdapter(ModelAdapter):
                 model_id=s.deepseek_model_id,
             )
 
-        # 接口返回错误（如模型 ID 无效、认证失败等），脱敏后原样反馈
         detail = sanitize_text(resp.text, secret)
         return ModelCheckResult(
             success=False,
@@ -71,3 +69,36 @@ class DeepSeekAdapter(ModelAdapter):
             message=f"接口返回错误（HTTP {resp.status_code}）：{detail}",
             model_id=s.deepseek_model_id,
         )
+
+    def chat(self, messages: list[dict], temperature: float = 0.0) -> str:
+        s = self.settings
+        secret = getattr(s, "deepseek_api_key", "") or ""
+
+        if not s.is_model_configured:
+            raise ModelError("未配置 API Key，请在 backend/.env 中填写 DEEPSEEK_API_KEY。")
+
+        base_url = (s.deepseek_api_base_url or "").rstrip("/")
+        url = f"{base_url}/chat/completions"
+        payload = {
+            "model": s.deepseek_model_id,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": 2000,
+            "stream": False,
+        }
+
+        try:
+            with httpx.Client(timeout=s.model_request_timeout_seconds) as client:
+                resp = client.post(url, json=payload, headers=self._headers())
+        except httpx.HTTPError as exc:
+            raise ModelError(sanitize_text(f"模型网络请求失败：{exc}", secret)) from exc
+
+        if resp.status_code >= 400:
+            detail = sanitize_text(resp.text, secret)
+            raise ModelError(f"模型接口错误（HTTP {resp.status_code}）：{detail}")
+
+        try:
+            data = resp.json()
+            return data["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError, ValueError) as exc:
+            raise ModelError("模型返回格式异常，无法读取回复内容。") from exc

@@ -6,7 +6,17 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import customers, health, ledger, model, packages, services, trash
+from app.api.routes import (
+    agent,
+    customers,
+    health,
+    ledger,
+    model,
+    packages,
+    services,
+    settings as settings_routes,
+    trash,
+)
 from app.core.config import get_settings
 from app.core.database import init_db
 from app.core.logging import SanitizingFilter
@@ -30,6 +40,14 @@ _apply_log_filter()
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
+    from app.agent.prompt_loader import ensure_prompt_initialized
+    from app.core.database import get_session_factory
+
+    db = get_session_factory()()
+    try:
+        ensure_prompt_initialized(db)
+    finally:
+        db.close()
     yield
 
 
@@ -61,3 +79,5 @@ app.include_router(services.router)
 app.include_router(packages.router)
 app.include_router(ledger.router)
 app.include_router(trash.router)
+app.include_router(agent.router)
+app.include_router(settings_routes.router)

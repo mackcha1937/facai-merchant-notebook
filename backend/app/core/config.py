@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     deepseek_api_base_url: str = "https://api.deepseek.com"
     deepseek_model_id: str = "deepseek-v4-pro"
     deepseek_api_key: str = ""
-    model_request_timeout_seconds: float = 30.0
+    model_request_timeout_seconds: float = 60.0
 
     # 前端开发服务器跨域来源（多个用英文逗号分隔）
     cors_origins: str = "http://127.0.0.1:5173,http://localhost:5173"

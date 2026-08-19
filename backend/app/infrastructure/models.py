@@ -6,7 +6,7 @@
 """
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -92,3 +92,24 @@ class LedgerEntry(Base):
 
     customer = relationship("Customer", back_populates="ledger_entries")
     service = relationship("Service")
+
+
+class PromptVersion(Base):
+    __tablename__ = "prompt_versions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+
+class AgentProposal(Base):
+    __tablename__ = "agent_proposals"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    original_input: Mapped[str] = mapped_column(Text, nullable=False)
+    parsed_json: Mapped[str] = mapped_column(Text, nullable=False)
+    prompt_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

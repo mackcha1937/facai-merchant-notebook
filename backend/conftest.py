@@ -17,7 +17,7 @@ from app.main import app
 
 @pytest.fixture()
 def db_session():
-    """每个测试独立的内存 SQLite 数据库。"""
+    """每个测试独立的内存 SQLite 数据库（含提示词初始化）。"""
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -26,6 +26,9 @@ def db_session():
     Base.metadata.create_all(engine)
     session_factory = sessionmaker(bind=engine, expire_on_commit=False)
     session = session_factory()
+    from app.agent.prompt_loader import ensure_prompt_initialized
+
+    ensure_prompt_initialized(session)
     yield session
     session.close()
     Base.metadata.drop_all(engine)

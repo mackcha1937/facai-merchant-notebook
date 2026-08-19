@@ -13,10 +13,19 @@ class ModelCheckResult:
     model_id: str = ""
 
 
+class ModelError(Exception):
+    """模型调用失败（信息已脱敏）。"""
+
+
 class ModelAdapter(ABC):
     """所有模型适配器需要实现的统一接口。"""
 
     @abstractmethod
     def check_connectivity(self) -> ModelCheckResult:
         """执行最小连通性检查，返回脱敏结果。"""
+        raise NotImplementedError
+
+    @abstractmethod
+    def chat(self, messages: list[dict], temperature: float = 0.0) -> str:
+        """发起一次对话补全请求，返回模型回复文本。"""
         raise NotImplementedError

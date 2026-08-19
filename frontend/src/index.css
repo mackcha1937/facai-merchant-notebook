@@ -314,6 +314,84 @@ select:focus {
   font-size: 14px;
 }
 
+.notice-banner {
+  background: #dcfce7;
+  color: #166534;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 12px 0;
+  font-size: 14px;
+}
+
+.input-area {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  min-width: 0;
+}
+
+.input-area.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+
+.input-area:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.preset-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.preset-list .muted {
+  margin: 0 0 2px;
+}
+
+button.preset {
+  background: #f1f5f9;
+  color: #334155;
+  text-align: left;
+  font-size: 13px;
+  padding: 6px 10px;
+}
+
+button.preset:hover {
+  background: #e2e8f0;
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.block {
+  margin: 12px 0;
+  padding-top: 10px;
+  border-top: 1px solid #eee;
+  font-size: 14px;
+}
+
+.block:first-of-type {
+  border-top: none;
+}
+
+.candidate {
+  padding: 6px 10px;
+  margin: 6px 0;
+  background: #f8fafc;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
 .footnote {
   color: #999;
   font-size: 12px;

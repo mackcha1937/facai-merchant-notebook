@@ -30,6 +30,8 @@ export const api = {
   deleteCustomer: (id) => request(`/api/customers/${id}`, { method: 'DELETE' }),
   restoreCustomer: (id) =>
     request(`/api/customers/${id}/restore`, { method: 'POST' }),
+  searchFuzzy: (query) =>
+    request('/api/customers/search-fuzzy', { method: 'POST', body: JSON.stringify({ query }) }),
 
   // 服务
   getServices: () => request('/api/services'),
@@ -58,6 +60,20 @@ export const api = {
 
   // 回收站
   getTrash: () => request('/api/trash'),
+
+  // Agent 解析（阶段2：只生成建议，不写入）
+  interpret: (text) =>
+    request('/api/agent/interpret', { method: 'POST', body: JSON.stringify({ text }) }),
+  getProposal: (id) => request(`/api/agent/proposals/${id}`),
+  cancelProposal: (id) => request(`/api/agent/proposals/${id}/cancel`, { method: 'POST' }),
+
+  // 提示词管理
+  getPrompt: () => request('/api/settings/prompt'),
+  getPromptVersions: () => request('/api/settings/prompt/versions'),
+  savePromptVersion: (content) =>
+    request('/api/settings/prompt/versions', { method: 'POST', body: JSON.stringify({ content }) }),
+  activatePromptVersion: (id) =>
+    request(`/api/settings/prompt/versions/${id}/activate`, { method: 'POST' }),
 }
 
 // 元 -> 分（价格存储单位是“分”）
