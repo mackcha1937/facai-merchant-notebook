@@ -1,0 +1,9 @@
+"""领域异常：用于把业务错误转换成可理解的中文提示。"""
+
+
+class DomainError(Exception):
+    """业务规则错误，对应 HTTP 400。"""
+
+
+class NotFoundError(Exception):
+    """资源不存在，对应 HTTP 404。"""

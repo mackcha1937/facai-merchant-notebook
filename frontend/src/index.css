@@ -1,0 +1,321 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: #f5f6f8;
+  color: #1f2328;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+}
+
+h1 {
+  font-size: 22px;
+  margin: 0 0 4px;
+}
+
+h2 {
+  font-size: 18px;
+  margin: 0 0 12px;
+}
+
+h3 {
+  font-size: 15px;
+  margin: 0 0 12px;
+}
+
+.subtitle {
+  color: #666;
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px;
+  margin: 16px 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.card a {
+  color: #2563eb;
+}
+
+/* 状态行 */
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+  font-size: 14px;
+}
+
+.status-row:last-child {
+  border-bottom: none;
+}
+
+.status-label {
+  color: #555;
+}
+
+.status-value {
+  font-weight: 600;
+  text-align: right;
+  word-break: break-all;
+}
+
+.status-value.ok {
+  color: #1a7f37;
+}
+
+.status-value.bad {
+  color: #c0392b;
+}
+
+.status-value.warn {
+  color: #b26a00;
+}
+
+.status-value.pending {
+  color: #888;
+}
+
+/* 按钮 */
+button {
+  padding: 7px 14px;
+  border: none;
+  border-radius: 6px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+button:disabled {
+  background: #a0aec0;
+  cursor: not-allowed;
+}
+
+button.danger {
+  background: #c0392b;
+}
+
+button.link {
+  background: none;
+  color: #2563eb;
+  padding: 4px 8px;
+}
+
+/* 输入 */
+input,
+select {
+  padding: 8px 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  font-size: 14px;
+  min-width: 0;
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+/* 标签页 */
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0;
+  flex-wrap: wrap;
+}
+
+.tab {
+  background: #e5e7eb;
+  color: #1f2328;
+}
+
+.tab.active {
+  background: #2563eb;
+  color: #fff;
+}
+
+/* 搜索与表单 */
+.search-bar {
+  margin-bottom: 12px;
+}
+
+.search-bar input {
+  width: 100%;
+}
+
+.inline-form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 12px 0;
+}
+
+.inline-form input,
+.inline-form select {
+  flex: 1 1 140px;
+}
+
+/* 列表 */
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.list-item.column {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.list-item:last-child {
+  border-bottom: none;
+}
+
+.list-item-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+
+.edit-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.edit-grid label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #555;
+}
+
+.edit-grid input {
+  flex: 1;
+}
+
+/* 标签 */
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+.tag-active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.tag-inactive {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.tag-exhausted {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.tag-customer {
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+.tag-service {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.tag-package {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.tag-ledger {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
+/* 提示与错误 */
+.muted {
+  color: #666;
+  font-size: 13px;
+}
+
+.empty {
+  padding: 12px 0;
+}
+
+.hint {
+  color: #666;
+  font-size: 13px;
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.error-banner {
+  background: #fee2e2;
+  color: #991b1b;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 12px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.footnote {
+  color: #999;
+  font-size: 12px;
+  margin-top: 16px;
+}

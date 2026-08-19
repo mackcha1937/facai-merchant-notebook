@@ -1,0 +1,21 @@
+# 依赖与构建产物
+node_modules/
+frontend/dist/
+
+# 后端
+backend/.venv/
+backend/venv/
+backend/data/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# 敏感文件：API Key 只保存在 backend/.env，绝不能提交
+backend/.env
+.env
+
+# 系统文件
+.DS_Store
+*.log
+*.pid
