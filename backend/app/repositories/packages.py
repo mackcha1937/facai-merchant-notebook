@@ -22,6 +22,24 @@ def list_packages_for_customer(db: Session, customer_id: int) -> list[Package]:
     )
 
 
+def list_packages_for_customer_service(
+    db: Session, customer_id: int, service_id: int
+) -> list[Package]:
+    """某客户某服务的未删除套餐卡（含各种状态，用于核销时人工选卡）。"""
+    return list(
+        db.scalars(
+            select(Package)
+            .where(
+                Package.customer_id == customer_id,
+                Package.service_id == service_id,
+                Package.deleted_at.is_(None),
+            )
+            .options(selectinload(Package.service))
+            .order_by(Package.id)
+        ).all()
+    )
+
+
 def get_package(db: Session, package_id: int) -> Package | None:
     return db.scalar(
         select(Package)

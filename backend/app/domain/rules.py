@@ -31,6 +31,14 @@ def validate_package_counts(total_count: int, used_count: int) -> tuple[int, int
     return total, used
 
 
+def validate_consume_quantity(package_total: int, package_used: int, quantity) -> int:
+    """核销校验：数量为正整数，且不能使余额为负。"""
+    q = ensure_positive_int(quantity, "核销数量")
+    if package_used + q > package_total:
+        raise DomainError("余额不足，无法核销")
+    return q
+
+
 def validate_display_name(name) -> str:
     if name is None or not str(name).strip():
         raise DomainError("客户化名不能为空")

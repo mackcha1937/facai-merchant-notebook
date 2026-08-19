@@ -392,6 +392,17 @@ button.preset:hover {
   font-size: 14px;
 }
 
+.candidate-list {
+  margin-top: 6px;
+}
+
+.candidate-list .candidate {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
 .footnote {
   color: #999;
   font-size: 12px;

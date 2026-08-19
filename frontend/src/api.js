@@ -66,6 +66,8 @@ export const api = {
     request('/api/agent/interpret', { method: 'POST', body: JSON.stringify({ text }) }),
   getProposal: (id) => request(`/api/agent/proposals/${id}`),
   cancelProposal: (id) => request(`/api/agent/proposals/${id}/cancel`, { method: 'POST' }),
+  confirmProposal: (id, data) =>
+    request(`/api/agent/proposals/${id}/confirm`, { method: 'POST', body: JSON.stringify(data) }),
 
   // 提示词管理
   getPrompt: () => request('/api/settings/prompt'),

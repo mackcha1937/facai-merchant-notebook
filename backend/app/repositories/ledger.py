@@ -44,15 +44,21 @@ def create_ledger_entry(
     quantity: int,
     price_cents: int | None,
     occurred_on: str | None,
+    package_id: int | None = None,
+    original_input: str | None = None,
+    agent_prompt_version: int | None = None,
 ) -> LedgerEntry:
     entry = LedgerEntry(
         customer_id=customer_id,
         entry_type=entry_type,
+        package_id=package_id,
         service_id=service_id,
         product_name=product_name,
         quantity=quantity,
         price_cents=price_cents,
         occurred_on=occurred_on,
+        original_input=original_input,
+        agent_prompt_version=agent_prompt_version,
     )
     db.add(entry)
     db.flush()
