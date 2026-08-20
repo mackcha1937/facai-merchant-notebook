@@ -1,10 +1,12 @@
 """FastAPI 应用入口。"""
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import (
     agent,
@@ -81,3 +83,25 @@ app.include_router(ledger.router)
 app.include_router(trash.router)
 app.include_router(agent.router)
 app.include_router(settings_routes.router)
+
+# ---- 前后端合并：后端托管前端构建产物（单端口运行） ----
+FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+
+if (FRONTEND_DIST / "assets").exists():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+async def serve_frontend(full_path: str):
+    """SPA 回退：非 API 路径返回前端页面。"""
+    if FRONTEND_DIST.exists():
+        candidate = (FRONTEND_DIST / full_path).resolve()
+        if candidate.is_file() and FRONTEND_DIST.resolve() in candidate.parents:
+            return FileResponse(candidate)
+        index = FRONTEND_DIST / "index.html"
+        if index.exists():
+            return FileResponse(index)
+    return JSONResponse(
+        status_code=404,
+        content={"detail": "前端未构建，请先在 frontend 目录运行 npm run build"},
+    )
