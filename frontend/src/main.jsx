@@ -11,11 +11,10 @@ import VerifyStage0 from './pages/v1/VerifyStage0.jsx'
 import VerifyStage1 from './pages/v1/VerifyStage1.jsx'
 import VerifyStage2 from './pages/v1/VerifyStage2.jsx'
 import VerifyStage3 from './pages/v1/VerifyStage3.jsx'
+import VerifyStage4 from './pages/v1/VerifyStage4.jsx'
 import CustomerSheet from './pages/v1/CustomerSheet.jsx'
 import Settings from './pages/v1/Settings.jsx'
 import PromptSettings from './pages/v1/PromptSettings.jsx'
-// 旧验证页（保留，供对照）
-import VerifyStage4 from './pages/VerifyStage4.jsx'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

@@ -38,6 +38,21 @@ def test_purchase_does_not_change_last_consumption(db_session):
     assert summaries[0]["last_consumed_at"] is None  # 购买不覆盖最后消费
 
 
+def test_product_purchase_does_not_change_last_consumption(db_session):
+    svc = service_repo.create_service(db_session, "面部清洁", "active")
+    cust = customer_repo.create_customer(db_session, "小红", ["红姐"])
+    db_session.commit()
+
+    ledger_service.create_ledger_entry(
+        db_session, cust.id,
+        LedgerEntryCreate(entry_type="product_purchase", product_name="面霜", quantity=1, occurred_on="2026-08-20"),
+    )
+
+    summaries = customer_read_service.list_customer_summaries(db_session)
+    assert summaries[0]["last_consumed_at"] is None  # 商品购买不算消费
+    assert summaries[0]["last_consumed_service_name"] is None
+
+
 def test_overview_and_service_detail(db_session):
     svc = service_repo.create_service(db_session, "面部清洁", "active")
     cust = customer_repo.create_customer(db_session, "小红", ["红姐"])
