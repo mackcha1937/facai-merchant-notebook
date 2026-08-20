@@ -1,8 +1,8 @@
 # 后端分层与分阶段开发文档
 
-版本：v0.1  
-状态：开发前确认稿  
-日期：2026-08-19
+版本：v1.0  
+状态：开发基线·已确认  
+日期：2026-08-20
 
 ## 1. 文档目的
 
@@ -154,13 +154,17 @@ backend/
 | customer_id | 客户 |
 | service_id | 服务项目 |
 | total_count | 总次数 |
-| used_count | 累计已用 |
+| opening_used_count | 首次导入纸质账本时的历史已用次数，默认0 |
 | price | 可选价格，使用定点小数或整数分 |
 | purchased_on | 可选购买日期 |
 | status | active / exhausted / inactive |
 | deleted_at | 软删除时间 |
 
-剩余次数不作为任意可写字段；由 `total_count - used_count` 计算，避免字段互相矛盾。
+`used_count` 和剩余次数不作为任意可写字段。权威累计已用由
+`opening_used_count + SUM(未删除的 package_consumption.quantity)` 计算，剩余次数由
+`total_count - used_count` 计算。这样删除或恢复核销记录时，余额会随有效账本事实自动回退或恢复。
+
+套餐状态由权威余额派生：剩余为0时为 `exhausted`；被店主停用时为 `inactive`；否则为 `active`。如数据库缓存这些派生字段，必须在同一事务中更新并可由账本重建。
 
 ### 4.5 LedgerEntry
 
@@ -203,8 +207,27 @@ backend/
 | prompt_version | 提示词版本 |
 | status | pending / confirmed / cancelled / expired |
 | created_at | 创建时间 |
+| confirmed_at | 确认写入时间，可选 |
 
 确认写入时必须根据当前数据库状态重新校验，不直接相信旧预览。
+
+### 4.8 客户查询读模型
+
+为避免前端自行拼接余额和最后消费信息，后端提供专用读模型：
+
+- `CustomerSummary`：客户ID、化名、别名、最后消费服务、最后消费日期、服务类型数量；
+- `CustomerOverview`：客户基本信息、最后消费日期、服务类型摘要、有效套餐数量、最近动态；
+- `CustomerServiceDetail`：当前服务信息、该服务的多张套餐卡、一次性服务标记和该服务历史。
+
+“最后消费”只统计未删除的 `package_consumption` 与 `one_time_service`，按 `occurred_on` 和创建时间确定最新一条；`package_purchase` 与 `product_purchase` 不参与计算。从未消费的客户返回 `null`。
+
+### 4.9 删除、编辑与恢复规则
+
+- 账本事实采用软删除；删除套餐核销后，权威已用次数和剩余次数按未删除记录重新计算；
+- 恢复核销记录前必须重新校验套餐、客户、服务及恢复后的余额，恢复会导致余额小于0时拒绝；
+- 修改已入账的核销记录采用“软删除旧记录 + 创建更正记录”的事务方式，保留审计线索，不直接覆盖历史事实；
+- 恢复父对象时不得自动恢复所有子对象，必须明确选择并通过关联校验；
+- 所有余额变化、账本记录和关联状态更新必须在同一数据库事务中完成。
 
 ## 5. Agent结构化协议
 
@@ -242,9 +265,12 @@ backend/
 
 ### 6.2 客户与别名
 
-- `GET /api/customers`；
+- `GET /api/customers?search=&sort=last_consumed_desc`：列表、别名搜索和最后消费排序；
 - `POST /api/customers`；
 - `GET /api/customers/{id}`；
+- `GET /api/customers/{id}/overview`：客户概览读模型；
+- `GET /api/customers/{id}/services`：该客户服务类型摘要；
+- `GET /api/customers/{id}/services/{service_id}`：服务详情、多卡与服务历史；
 - `PATCH /api/customers/{id}`；
 - `DELETE /api/customers/{id}`：软删除；
 - `POST /api/customers/{id}/restore`。
@@ -264,6 +290,9 @@ backend/
 - `DELETE /api/packages/{id}`；
 - `POST /api/packages/{id}/restore`；
 - `GET /api/customers/{id}/ledger`；
+- `POST /api/customers/{id}/ledger`：手动新增一次性服务、商品购买或其他白名单内记录；
+- `PATCH /api/ledger/{id}`：以更正事务处理，不直接覆盖原始账本事实；
+- `DELETE /api/ledger/{id}`：软删除并重新计算受影响套餐余额；
 - `POST /api/ledger/{id}/restore`。
 
 ### 6.5 Agent与确认
@@ -273,6 +302,14 @@ backend/
 - `POST /api/agent/proposals/{id}/confirm`：重新校验并写入；
 - `POST /api/agent/proposals/{id}/cancel`；
 - `POST /api/customers/search-fuzzy`：候选匹配。
+
+确认接口必须满足：
+
+- 只允许确认 `pending` 状态的建议，同一建议只能成功确认一次；
+- 有歧义的项目必须先解决或从建议中移除；
+- 对建议中全部剩余操作先统一校验，再在单个数据库事务中写入；
+- 任一操作失败时整组回滚，不允许部分成功；
+- 返回每项实际入账结果、发生日期及后端计算的最新余额。
 
 ### 6.6 回收站
 
@@ -335,6 +372,8 @@ http://127.0.0.1:8000/docs
 - Customer、CustomerAlias、Service、Package、LedgerEntry；
 - 客户、服务、套餐和记录CRUD；
 - 客户搜索；
+- 客户列表最后消费聚合与倒序；
+- 客户概览、服务类型摘要和服务详情读模型；
 - 套餐余额后端计算；
 - 二次确认所需预检查；
 - 软删除、回收站和恢复；
@@ -404,6 +443,8 @@ http://127.0.0.1:5173/settings/prompt
 - 套餐核销；
 - 一次性服务；
 - 商品购买；
+- 多项操作统一确认和整组事务回滚；
+- Proposal幂等确认，防止重复入账；
 - 多张同类卡人工选择；
 - 余额不足保护；
 - 模糊查询最多3位候选；
@@ -436,6 +477,9 @@ http://127.0.0.1:5173/verify/stage-3
 - 异常输入和模型失败处理；
 - 提示词版本回退测试；
 - 软删除和恢复一致性测试；
+- 删除、恢复核销记录后的余额重算测试；
+- 最后消费口径和客户排序测试；
+- 多项确认全部成功或全部回滚测试；
 - 本地数据库备份说明；
 - 启动、停止和配置说明。
 
@@ -491,6 +535,9 @@ http://127.0.0.1:5173/verify/stage-4
 - 一次性服务不改变套餐；
 - 软删除数据不出现在正常查询；
 - 恢复后余额和关联不变。
+- 删除核销记录后余额回退，恢复后余额重新扣减；
+- 套餐购买和商品购买不改变“最后消费”；
+- 多项确认中任一项失败时不得留下部分记录。
 
 ### 10.2 Agent协议测试
 

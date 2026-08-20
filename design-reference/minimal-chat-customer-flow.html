@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>发财｜聊天确认与客户Sheet交互</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif; color: #262626; }
+    body { margin: 0; background: #f4f5f7; }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    .page { width: min(960px, calc(100% - 26px)); margin: 0 auto; padding: 42px 0 70px; }
+    .page-head { max-width: 720px; margin-bottom: 26px; }
+    .eyebrow { color: #81858d; font-size: 11px; font-weight: 850; letter-spacing: .15em; }
+    h1 { margin: 9px 0 8px; font-size: clamp(34px, 5vw, 54px); font-weight: 650; letter-spacing: -.045em; }
+    .lead { margin: 0; color: #70757d; font-size: 14px; line-height: 1.75; }
+    .stage { display: grid; grid-template-columns: 410px 1fr; gap: 34px; align-items: center; padding: 27px; border: 1px solid #e2e4e8; border-radius: 30px; background: #fff; box-shadow: 0 22px 60px rgba(40,45,55,.07); }
+    .app { position: relative; height: 780px; overflow: hidden; border: 1px solid #e4e7ed; border-radius: 34px; background: #fff; box-shadow: 0 26px 64px rgba(45,52,66,.15); }
+    .status { height: 34px; display: flex; justify-content: space-between; align-items: end; padding: 0 18px 7px; color: #969ba3; font-size: 9px; font-weight: 750; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; padding: 9px 16px 8px; border-bottom: 1px solid #f0f1f3; }
+    .brand { display: flex; align-items: center; gap: 9px; }
+    .logo { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 12px; background: #5d75db; color: #fff; font-size: 14px; font-weight: 900; }
+    .brand strong { font-size: 15px; }
+    .brand small { display: block; margin-top: 1px; color: #989ca4; font-size: 8px; }
+    .top-actions { display: flex; gap: 7px; }
+    .icon { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid #e7e9ed; border-radius: 11px; background: #fff; color: #666b74; }
+    .chat { position: absolute; inset: 86px 0 129px; overflow-y: auto; padding: 16px 15px 28px; scrollbar-width: none; }
+    .chat::-webkit-scrollbar { display: none; }
+    .day { margin-bottom: 13px; color: #a0a4ab; font-size: 9px; text-align: center; }
+    .message { max-width: 88%; margin-top: 10px; padding: 11px 13px; border-radius: 17px; font-size: 11px; line-height: 1.62; }
+    .assistant { border: 1px solid #e9ebef; border-bottom-left-radius: 5px; background: #f8f9fb; color: #4e5259; }
+    .user { margin-left: auto; border-bottom-right-radius: 5px; background: #5d75db; color: #fff; box-shadow: 0 8px 19px rgba(93,117,219,.18); }
+    .confirm-message { width: 100%; margin-top: 12px; padding: 0; border: 1px solid #e4e7ed; border-radius: 20px; overflow: hidden; background: #fff; box-shadow: 0 10px 28px rgba(48,55,69,.08); }
+    .confirm-head { padding: 15px 15px 12px; }
+    .confirm-kicker { display: flex; justify-content: space-between; align-items: center; color: #92969e; font-size: 9px; font-weight: 800; }
+    .state-dot { display: inline-flex; align-items: center; gap: 5px; color: #6076d4; }
+    .state-dot::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .confirm-title { margin: 8px 0 3px; font-size: 17px; font-weight: 750; }
+    .confirm-subtitle { color: #8d929a; font-size: 10px; }
+    .confirm-body { margin: 0 14px; padding: 12px; border: 1px solid #e6e8ed; border-radius: 15px; background: #fafbfc; }
+    .info-row { display: flex; justify-content: space-between; align-items: center; font-size: 11px; }
+    .info-row + .info-row { margin-top: 9px; }
+    .info-row span { color: #8c9199; }
+    .info-row strong { color: #26292e; }
+    .info-row.result strong { color: #5d75db; }
+    .edit-panel { display: none; margin: 10px 14px 0; padding: 12px; border-radius: 15px; background: #f4f6fb; }
+    .edit-panel.open { display: block; }
+    .edit-field { display: flex; justify-content: space-between; align-items: center; }
+    .edit-field + .edit-field { margin-top: 10px; }
+    .edit-field label { color: #737881; font-size: 10px; }
+    .edit-field input { width: 128px; border: 1px solid #dfe3eb; border-radius: 9px; padding: 7px 8px; background: #fff; color: #34373c; font-size: 10px; }
+    .stepper { display: flex; align-items: center; border: 1px solid #dfe3eb; border-radius: 9px; overflow: hidden; background: #fff; }
+    .stepper button { width: 29px; height: 29px; border: 0; background: #fff; color: #5d75db; }
+    .stepper b { min-width: 30px; text-align: center; font-size: 10px; }
+    .confirm-actions { display: grid; grid-template-columns: .75fr 1.25fr; gap: 8px; padding: 13px 14px 14px; }
+    .confirm-actions button { border: 0; padding: 11px; border-radius: 12px; font-size: 11px; font-weight: 750; }
+    .modify { background: #f0f2fb; color: #686e7d; }
+    .confirm { background: #5d75db; color: #fff; }
+    .confirmed-view { display: none; padding: 13px 15px 15px; }
+    .confirmed-view.show { display: block; }
+    .success-line { display: flex; align-items: center; gap: 9px; color: #2c765b; font-size: 11px; font-weight: 750; }
+    .success-check { width: 25px; height: 25px; display: grid; place-items: center; border-radius: 50%; background: #e2f4eb; color: #2c765b; }
+    .success-note { margin-top: 8px; color: #80858d; font-size: 10px; line-height: 1.55; }
+    .composer { position: absolute; z-index: 14; left: 13px; right: 13px; bottom: 71px; display: flex; align-items: center; gap: 7px; padding: 7px 7px 7px 12px; border: 1px solid #dfe2e8; border-radius: 18px; background: #fff; box-shadow: 0 12px 29px rgba(44,51,65,.11); }
+    .composer input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: #35383e; font-size: 10px; }
+    .send { width: 34px; height: 34px; border: 0; border-radius: 12px; background: #5d75db; color: #fff; }
+    .nav { position: absolute; z-index: 13; left: 13px; right: 13px; bottom: 10px; height: 53px; display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid #f0f1f3; background: #fff; }
+    .nav button { border: 0; display: grid; place-items: center; align-content: center; gap: 2px; background: transparent; color: #979ba2; font-size: 8px; }
+    .nav i { font-style: normal; font-size: 16px; }
+    .nav .active { color: #5d75db; }
+
+    .customer-sheet { position: absolute; z-index: 50; inset: 94px 0 0; transform: translateY(103%); transition: transform .34s cubic-bezier(.2,.8,.2,1); border-top: 1px solid #e5e7ec; border-radius: 26px 26px 0 0; background: #fff; box-shadow: 0 -24px 60px rgba(32,39,51,.18); }
+    .customer-sheet.open { transform: translateY(0); }
+    .sheet-handle { width: 36px; height: 4px; margin: 10px auto 9px; border-radius: 10px; background: #d9dce1; }
+    .sheet-page { position: absolute; inset: 23px 0 0; padding: 8px 16px 24px; overflow-y: auto; background: #fff; }
+    .sheet-page.hidden { display: none; }
+    .sheet-title { display: flex; justify-content: space-between; align-items: center; }
+    .sheet-title h3 { margin: 0; font-size: 20px; }
+    .close { width: 34px; height: 34px; border: 0; border-radius: 11px; background: #f3f4f6; color: #6d727a; }
+    .sheet-search { display: flex; gap: 8px; align-items: center; margin-top: 14px; padding: 10px 12px; border: 1px solid #e4e7ec; border-radius: 13px; background: #fafbfc; }
+    .sheet-search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; font-size: 10px; }
+    .customer-list { display: grid; gap: 8px; margin-top: 12px; }
+    .customer-item { width: 100%; display: flex; gap: 10px; align-items: center; padding: 11px; border: 1px solid #e7e9ed; border-radius: 15px; background: #fff; text-align: left; }
+    .avatar { width: 38px; height: 38px; display: grid; place-items: center; flex: none; border-radius: 13px; background: #eef1fb; color: #5d75db; font-size: 12px; font-weight: 800; }
+    .customer-main { min-width: 0; flex: 1; }
+    .customer-name { font-size: 12px; font-weight: 750; }
+    .customer-note { margin-top: 3px; overflow: hidden; color: #92969d; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+    .customer-balance { text-align: right; color: #8b9098; font-size: 8px; }
+    .customer-balance strong { display: block; color: #34373d; font-size: 14px; }
+    .customer-note b { color: #69707a; font-weight: 650; }
+    .back { display: flex; align-items: center; gap: 6px; border: 0; padding: 0; background: transparent; color: #5d75db; font-size: 10px; }
+    .detail-head { margin-top: 15px; display: flex; gap: 11px; align-items: center; }
+    .detail-head .avatar { width: 45px; height: 45px; }
+    .detail-head h3 { margin: 0; font-size: 19px; }
+    .detail-head p { margin: 3px 0 0; color: #92969d; font-size: 9px; }
+    .overview-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+    .overview-stat { padding: 11px 12px; border: 1px solid #e7e9ed; border-radius: 14px; background: #fafbfc; }
+    .overview-stat span { display: block; color: #92969d; font-size: 8px; }
+    .overview-stat strong { display: block; margin-top: 4px; color: #33363c; font-size: 15px; }
+    .service-list { display: grid; gap: 8px; }
+    .service-item { width: 100%; display: flex; gap: 10px; align-items: center; padding: 11px; border: 1px solid #e7e9ed; border-radius: 15px; background: #fff; text-align: left; }
+    .service-icon { width: 36px; height: 36px; display: grid; place-items: center; flex: none; border-radius: 12px; background: #eef1fb; color: #5d75db; font-size: 12px; }
+    .service-main { min-width: 0; flex: 1; }
+    .service-main strong { display: block; font-size: 11px; }
+    .service-main span { display: block; margin-top: 3px; overflow: hidden; color: #92969d; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+    .service-summary { text-align: right; color: #92969d; font-size: 8px; }
+    .service-summary strong { display: block; color: #5d75db; font-size: 11px; }
+    .service-summary i { margin-left: 4px; color: #b1b5bc; font-style: normal; }
+    .section-head { display: flex; justify-content: space-between; align-items: center; margin: 19px 1px 9px; }
+    .section-head strong { font-size: 12px; }
+    .section-head button { border: 0; background: transparent; color: #5d75db; font-size: 9px; }
+    .package-card { padding: 14px; border: 1px solid #e4e7ed; border-radius: 17px; background: #fafbfc; }
+    .package-top { display: flex; justify-content: space-between; align-items: start; }
+    .package-top strong { font-size: 13px; }
+    .package-top span { color: #8c9199; font-size: 9px; }
+    .package-number { color: #5d75db; font-size: 18px; font-weight: 800; }
+    .progress { height: 7px; margin-top: 12px; overflow: hidden; border-radius: 99px; background: #e8eaf0; }
+    .progress i { display: block; width: 33.33%; height: 100%; border-radius: inherit; background: #5d75db; transition: width .25s ease; }
+    .package-foot { display: flex; justify-content: space-between; margin-top: 8px; color: #8f949b; font-size: 9px; }
+    .history { display: grid; gap: 8px; }
+    .history-item { display: flex; gap: 10px; padding: 11px; border: 1px solid #eaecf0; border-radius: 14px; }
+    .history-icon { width: 31px; height: 31px; display: grid; place-items: center; flex: none; border-radius: 10px; background: #eef1fb; color: #5d75db; }
+    .history-main { flex: 1; }
+    .history-main strong { font-size: 10px; }
+    .history-main span { display: block; margin-top: 3px; color: #93979e; font-size: 8px; }
+    .history-count { color: #5d75db; font-size: 10px; font-weight: 750; }
+
+    .guide h2 { margin: 0 0 10px; font-size: 26px; }
+    .guide > p { margin: 0; color: #747982; font-size: 13px; line-height: 1.75; }
+    .steps { display: grid; gap: 10px; margin-top: 22px; }
+    .step { display: flex; gap: 12px; padding: 13px 14px; border: 1px solid #e7e9ed; border-radius: 15px; background: #fafafa; }
+    .step b { width: 25px; height: 25px; display: grid; place-items: center; flex: none; border-radius: 9px; background: #eef1fb; color: #5d75db; font-size: 10px; }
+    .step strong { display: block; font-size: 11px; }
+    .step span { display: block; margin-top: 3px; color: #858a92; font-size: 10px; line-height: 1.55; }
+    .tip { margin-top: 18px; padding: 13px 14px; border-radius: 14px; background: #f1f3fb; color: #697080; font-size: 10px; line-height: 1.65; }
+    @media(max-width:800px){.page{width:min(100% - 18px,440px);padding-top:28px}.stage{grid-template-columns:1fr;padding:13px}.app{height:744px}.guide{padding:15px 5px 5px}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="page-head"><div class="eyebrow">发财 · 交互细化</div><h1>确认留在聊天里，账本随时能核对。</h1><p class="lead">自然语言解析结果以聊天卡片展示，店主可修改日期和次数后确认；客户 Sheet 用于搜索客户、查看套餐余额和最近核销记录。</p></header>
+    <section class="stage">
+      <div class="app">
+        <div class="status"><span>9:41</span><span>● ◒ ︿</span></div>
+        <header class="topbar"><div class="brand"><div class="logo">发</div><div><strong>发财</strong><small>智能客户账本</small></div></div><div class="top-actions"><button class="icon">⌕</button><button class="icon">＋</button></div></header>
+        <div class="chat" id="chat"><div class="day">2026年8月20日</div><div class="message assistant">下午好～直接告诉我客户今天买了什么、做了什么，写入前我会请你确认。</div><div class="message user">小蓝今天肩颈按摩1次</div>
+          <section class="confirm-message" id="confirm-card">
+            <div class="confirm-head"><div class="confirm-kicker"><span>确认后才会写入</span><span class="state-dot" id="state-label">待确认</span></div><div class="confirm-title">小蓝 · 肩颈按摩</div><div class="confirm-subtitle">识别为套餐核销<span id="subtitle-qty">1</span>次</div></div>
+            <div id="pending-view"><div class="confirm-body"><div class="info-row"><span>本次核销</span><strong><span id="qty-view">1</span>次</strong></div><div class="info-row"><span>核销日期</span><strong id="date-view">2026年8月20日</strong></div><div class="info-row result"><span>确认后</span><strong id="balance-view">累计使用 2/3 · 剩余1次</strong></div></div>
+              <div class="edit-panel" id="edit-panel"><div class="edit-field"><label>核销次数</label><div class="stepper"><button id="minus">−</button><b id="qty-edit">1</b><button id="plus">＋</button></div></div><div class="edit-field"><label for="date-input">核销日期</label><input id="date-input" type="date" value="2026-08-20"></div></div>
+              <div class="confirm-actions"><button class="modify" id="modify">修改</button><button class="confirm" id="confirm">确认入账</button></div>
+            </div>
+            <div class="confirmed-view" id="confirmed-view"><div class="success-line"><span class="success-check">✓</span><span>已于 <b id="success-date">2026年8月20日</b> 入账</span></div><div class="success-note" id="success-note">肩颈按摩累计使用 2/3 次，剩余1次。可在“客户 → 小蓝”中查看。</div></div>
+          </section>
+        </div>
+        <div class="composer"><input value="继续输入购买、核销或查询"><button class="send">➜</button></div>
+        <nav class="nav"><button class="active" id="chat-tab"><i>◉</i>对话</button><button id="customer-tab"><i>♡</i>客户</button><button><i>⚙</i>设置</button></nav>
+
+        <section class="customer-sheet" id="customer-sheet"><div class="sheet-handle"></div>
+          <div class="sheet-page" id="customer-list-page"><div class="sheet-title"><h3>客户账本</h3><button class="close" id="close-sheet">×</button></div><div class="sheet-search">⌕<input id="customer-search" placeholder="搜索客户或别名"></div><div class="customer-list" id="customer-list">
+            <button class="customer-item" data-customer="小红"><span class="avatar">红</span><span class="customer-main"><span class="customer-name">小红 · 红姐</span><span class="customer-note"><b>最近：脱毛</b> · 2026年8月18日</span></span><span class="customer-balance"><strong>2类</strong>服务 ›</span></button>
+            <button class="customer-item" data-customer="小黄"><span class="avatar">黄</span><span class="customer-main"><span class="customer-name">小黄 · 黄姐</span><span class="customer-note"><b>最近：面部清洁</b> · 2026年8月16日</span></span><span class="customer-balance"><strong>3类</strong>服务 ›</span></button>
+            <button class="customer-item" data-customer="小蓝" id="xiaolan-item"><span class="avatar">蓝</span><span class="customer-main"><span class="customer-name">小蓝 · 蓝蓝</span><span class="customer-note" id="xiaolan-recent"><b>最近：肩颈按摩</b> · 2026年8月15日</span></span><span class="customer-balance"><strong>4类</strong>服务 ›</span></button>
+          </div></div>
+          <div class="sheet-page hidden" id="customer-detail-page">
+            <div class="sheet-title"><button class="back" id="back-list">← 返回客户列表</button><button class="close" id="close-detail">×</button></div>
+            <div class="detail-head"><span class="avatar">蓝</span><div><h3>小蓝</h3><p>别名：蓝蓝 · 最近消费 <span id="overview-recent">2026年8月15日</span></p></div></div>
+            <div class="overview-stats"><div class="overview-stat"><span>服务类型</span><strong>4类</strong></div><div class="overview-stat"><span>有效套餐</span><strong>3个</strong></div></div>
+            <div class="section-head"><strong>全部服务</strong><button>＋ 新增服务</button></div>
+            <div class="service-list">
+              <button class="service-item" data-service="shoulder"><span class="service-icon">肩</span><span class="service-main"><strong>肩颈按摩</strong><span id="shoulder-recent">最近消费：2026年8月15日</span></span><span class="service-summary"><strong id="shoulder-summary">剩余2/3</strong>查看详情 <i>›</i></span></button>
+              <button class="service-item" data-service="face"><span class="service-icon">脸</span><span class="service-main"><strong>面部清洁</strong><span>最近消费：2026年8月12日</span></span><span class="service-summary"><strong>剩余4/5</strong>查看详情 <i>›</i></span></button>
+              <button class="service-item" data-service="body"><span class="service-icon">身</span><span class="service-main"><strong>身体护理</strong><span>最近消费：2026年8月5日</span></span><span class="service-summary"><strong>剩余6/10</strong>查看详情 <i>›</i></span></button>
+              <button class="service-item" data-service="acne"><span class="service-icon">痘</span><span class="service-main"><strong>清痘</strong><span>最近消费：2026年7月28日</span></span><span class="service-summary"><strong>一次性</strong>查看详情 <i>›</i></span></button>
+            </div>
+            <div class="section-head"><strong>最近动态</strong><button>查看全部</button></div>
+            <div class="history" id="overview-history"><div class="history-item"><span class="history-icon">−</span><span class="history-main"><strong>肩颈按摩</strong><span>2026年8月15日 · 套餐核销</span></span><span class="history-count">−1次</span></div><div class="history-item"><span class="history-icon">−</span><span class="history-main"><strong>面部清洁</strong><span>2026年8月12日 · 套餐核销</span></span><span class="history-count">−1次</span></div></div>
+          </div>
+          <div class="sheet-page hidden" id="service-detail-page">
+            <div class="sheet-title"><button class="back" id="back-services">← 返回小蓝的服务</button><button class="close" id="close-service">×</button></div>
+            <div class="detail-head"><span class="service-icon" id="service-detail-icon">肩</span><div><h3 id="service-detail-name">肩颈按摩</h3><p id="service-detail-recent">最近消费：2026年8月15日</p></div></div>
+            <div class="section-head"><strong>套餐详情</strong><button>编辑</button></div>
+            <div id="service-package"></div>
+            <div class="section-head"><strong>该服务记录</strong><button>＋ 记一笔</button></div>
+            <div class="history" id="service-history"></div>
+          </div>
+        </section>
+      </div>
+      <aside class="guide"><h2>可点击体验</h2><p>客户账本现在按“客户 → 服务类型 → 服务详情”逐层展开，避免一个客户服务过多时全部堆在同一页。</p><div class="steps"><div class="step"><b>1</b><div><strong>客户列表看最近消费</strong><span>每位客户只展示最后一次消费的服务与日期，不再用某一张套餐代表整个客户。</span></div></div><div class="step"><b>2</b><div><strong>进入客户查看全部服务</strong><span>点击小蓝后，可看到她的4类服务及每类服务的最近消费和余额摘要。</span></div></div><div class="step"><b>3</b><div><strong>二级进入服务详情</strong><span>再点击肩颈按摩，查看具体套餐、使用进度及只属于该服务的历史记录。</span></div></div></div><div class="tip">先在聊天中确认入账，再进入“客户 → 小蓝 → 肩颈按摩”，可以看到最近消费日期、余额和历史同步更新。刷新页面可恢复初始状态。</div></aside>
+    </section>
+  </main>
+  <script>
+    let qty=1, confirmed=false, activeService=null;
+    const $=id=>document.getElementById(id);
+    const formatDate=value=>{if(!value)return '未选择';const [y,m,d]=value.split('-');return `${y}年${Number(m)}月${Number(d)}日`;};
+    const serviceData={
+      shoulder:{icon:'肩',name:'肩颈按摩',latestIso:'2026-08-15',total:3,used:1,price:299,type:'package',history:[{date:'2026-08-15',qty:1,label:'套餐核销'}]},
+      face:{icon:'脸',name:'面部清洁',latestIso:'2026-08-12',total:5,used:1,price:666,type:'package',history:[{date:'2026-08-12',qty:1,label:'套餐核销'}]},
+      body:{icon:'身',name:'身体护理',latestIso:'2026-08-05',total:10,used:4,price:null,type:'package',history:[{date:'2026-08-05',qty:1,label:'套餐核销'},{date:'2026-07-22',qty:1,label:'套餐核销'}]},
+      acne:{icon:'痘',name:'清痘',latestIso:'2026-07-28',type:'one-time',history:[{date:'2026-07-28',qty:1,label:'一次性服务'}]}
+    };
+    function updatePreview(){const used=Math.min(3,1+qty),remaining=Math.max(0,3-used);$('qty-edit').textContent=qty;$('qty-view').textContent=qty;$('subtitle-qty').textContent=qty;$('date-view').textContent=formatDate($('date-input').value);$('balance-view').textContent=`累计使用 ${used}/3 · 剩余${remaining}次`;}
+    $('modify').addEventListener('click',()=>{$('edit-panel').classList.toggle('open');$('modify').textContent=$('edit-panel').classList.contains('open')?'收起':'修改';});
+    $('minus').addEventListener('click',()=>{qty=Math.max(1,qty-1);updatePreview();});
+    $('plus').addEventListener('click',()=>{qty=Math.min(2,qty+1);updatePreview();});
+    $('date-input').addEventListener('change',updatePreview);
+    function historyMarkup(entry,name){return `<div class="history-item"><span class="history-icon">−</span><span class="history-main"><strong>${name}</strong><span>${formatDate(entry.date)} · ${entry.label}</span></span><span class="history-count">−${entry.qty}次</span></div>`;}
+    function renderServiceDetail(key){activeService=key;const s=serviceData[key];$('service-detail-icon').textContent=s.icon;$('service-detail-name').textContent=s.name;$('service-detail-recent').textContent=`最近消费：${formatDate(s.latestIso)}`;if(s.type==='package'){const remaining=s.total-s.used;$('service-package').innerHTML=`<div class="package-card"><div class="package-top"><div><strong>${s.name}</strong><br><span>${s.total}次套餐${s.price?` · ¥${s.price}`:''}</span></div><div class="package-number">${remaining}/${s.total}</div></div><div class="progress"><i style="width:${s.used/s.total*100}%"></i></div><div class="package-foot"><span>已使用${s.used}次</span><span>剩余${remaining}次</span></div></div>`;}else{$('service-package').innerHTML=`<div class="package-card"><div class="package-top"><div><strong>${s.name}</strong><br><span>一次性服务，不计算套餐余额</span></div><div class="package-number">单次</div></div></div>`;}$('service-history').innerHTML=s.history.map(h=>historyMarkup(h,s.name)).join('');$('customer-detail-page').classList.add('hidden');$('service-detail-page').classList.remove('hidden');}
+    $('confirm').addEventListener('click',()=>{confirmed=true;const s=serviceData.shoulder,dateIso=$('date-input').value,date=formatDate(dateIso);s.used=Math.min(s.total,s.used+qty);s.history.unshift({date:dateIso,qty,label:'套餐核销'});if(dateIso>=s.latestIso)s.latestIso=dateIso;const remaining=s.total-s.used;$('pending-view').style.display='none';$('confirmed-view').classList.add('show');$('state-label').textContent='已入账';$('state-label').style.color='#2c765b';$('success-date').textContent=date;$('success-note').textContent=`肩颈按摩累计使用 ${s.used}/${s.total} 次，剩余${remaining}次。可在“客户 → 小蓝 → 肩颈按摩”中查看。`;$('xiaolan-recent').innerHTML=`<b>最近：肩颈按摩</b> · ${formatDate(s.latestIso)}`;$('overview-recent').textContent=formatDate(s.latestIso);$('shoulder-recent').textContent=`最近消费：${formatDate(s.latestIso)}`;$('shoulder-summary').textContent=`剩余${remaining}/${s.total}`;const item=document.createElement('div');item.className='history-item';item.innerHTML=`<span class="history-icon">−</span><span class="history-main"><strong>肩颈按摩</strong><span>${date} · 套餐核销</span></span><span class="history-count">−${qty}次</span>`;$('overview-history').prepend(item);if(activeService==='shoulder')renderServiceDetail('shoulder');});
+    function openCustomers(){ $('customer-sheet').classList.add('open');$('customer-tab').classList.add('active');$('chat-tab').classList.remove('active'); }
+    function closeCustomers(){ $('customer-sheet').classList.remove('open');$('customer-tab').classList.remove('active');$('chat-tab').classList.add('active'); }
+    function showCustomerList(){ $('customer-detail-page').classList.add('hidden');$('service-detail-page').classList.add('hidden');$('customer-list-page').classList.remove('hidden'); }
+    $('customer-tab').addEventListener('click',()=>{showCustomerList();openCustomers();});$('chat-tab').addEventListener('click',closeCustomers);$('close-sheet').addEventListener('click',closeCustomers);$('close-detail').addEventListener('click',closeCustomers);$('close-service').addEventListener('click',closeCustomers);
+    $('customer-search').addEventListener('input',e=>{const q=e.target.value.trim();document.querySelectorAll('.customer-item').forEach(item=>item.style.display=item.textContent.includes(q)?'flex':'none');});
+    document.querySelectorAll('.customer-item').forEach(item=>item.addEventListener('click',()=>{if(item.dataset.customer==='小蓝'){$('customer-list-page').classList.add('hidden');$('customer-detail-page').classList.remove('hidden');}}));
+    $('back-list').addEventListener('click',showCustomerList);
+    document.querySelectorAll('.service-item').forEach(item=>item.addEventListener('click',()=>renderServiceDetail(item.dataset.service)));
+    $('back-services').addEventListener('click',()=>{$('service-detail-page').classList.add('hidden');$('customer-detail-page').classList.remove('hidden');});
+    updatePreview();
+  </script>
+</body>
+</html>

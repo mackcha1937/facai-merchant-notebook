@@ -1,0 +1,40 @@
+/* 发财·美容店智能客户账本 —— 设计 Token（v1.0 视觉基线） */
+:root {
+  /* 色彩（来自 05 前端文档 14.2） */
+  --c-primary: #5D75DB;
+  --c-primary-bg: #EEF1FB;
+  --c-bg: #FFFFFF;
+  --c-surface: #F8F9FB;
+  --c-text: #262626;
+  --c-text-secondary: #70757D;
+  --c-text-weak: #92969D;
+  --c-border: #E4E7ED;
+  --c-success: #2C765B;
+  --c-success-bg: #E2F4EB;
+  --c-warning: #B8752A;
+  --c-danger: #C65353;
+
+  /* 字体 */
+  --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Display",
+    "PingFang SC", "Microsoft YaHei", sans-serif;
+
+  /* 圆角 */
+  --radius-btn: 11px;
+  --radius-card: 15px;
+  --radius-input: 17px;
+  --radius-sheet: 26px;
+  --radius-tag: 999px;
+
+  /* 间距（4px 网格） */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+
+  /* 阴影 */
+  --shadow-input: 0 12px 29px rgba(44, 51, 65, 0.11);
+  --shadow-card: 0 10px 28px rgba(48, 55, 69, 0.08);
+  --shadow-sheet: 0 -24px 60px rgba(32, 39, 51, 0.18);
+}

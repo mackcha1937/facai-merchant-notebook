@@ -1,0 +1,295 @@
+/* 发财·美容店智能客户账本 —— 全局与 v1.0 组件样式（移动端优先） */
+
+.v1-app {
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  position: relative;
+  max-width: 430px;
+  margin: 0 auto;
+  height: 100vh;
+  height: 100dvh;
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: var(--font-stack);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 顶部 */
+.v1-header {
+  flex: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px 8px;
+  border-bottom: 1px solid #f0f1f3;
+  background: var(--c-bg);
+}
+
+.v1-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.v1-logo {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--c-primary);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.v1-brand strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.v1-brand small {
+  display: block;
+  margin-top: 1px;
+  color: var(--c-text-weak);
+  font-size: 12px;
+}
+
+.v1-header-actions {
+  display: flex;
+  gap: 7px;
+}
+
+.v1-icon-btn {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--c-border);
+  border-radius: 11px;
+  background: var(--c-bg);
+  color: var(--c-text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* 内容区 */
+.v1-content {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.v1-chat {
+  padding: 16px 15px 28px;
+}
+
+.v1-day {
+  margin-bottom: 13px;
+  color: var(--c-text-weak);
+  font-size: 12px;
+  text-align: center;
+}
+
+.v1-message {
+  max-width: 88%;
+  margin-top: 10px;
+  padding: 11px 13px;
+  border-radius: 17px;
+  font-size: 14px;
+  line-height: 1.62;
+}
+
+.v1-assistant {
+  border: 1px solid #e9ebef;
+  border-bottom-left-radius: 5px;
+  background: var(--c-surface);
+  color: #4e5259;
+}
+
+.v1-user {
+  margin-left: auto;
+  border-bottom-right-radius: 5px;
+  background: var(--c-primary);
+  color: #fff;
+  box-shadow: 0 8px 19px rgba(93, 117, 219, 0.18);
+}
+
+/* 输入区 */
+.v1-composer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 13px 9px;
+  padding: 7px 7px 7px 12px;
+  border: 1px solid var(--c-border);
+  border-radius: 18px;
+  background: var(--c-bg);
+  box-shadow: var(--shadow-input);
+}
+
+.v1-composer input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #35383e;
+  font-size: 14px;
+}
+
+.v1-send {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border: 0;
+  border-radius: 12px;
+  background: var(--c-primary);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.v1-send:disabled {
+  background: #c7cfea;
+  cursor: not-allowed;
+}
+
+/* 底部导航 */
+.v1-nav {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid #f0f1f3;
+  background: var(--c-bg);
+  padding-bottom: var(--safe-bottom);
+}
+
+.v1-nav-item {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 2px;
+  padding: 7px 0;
+  border: 0;
+  background: transparent;
+  color: #979ba2;
+  font-size: 12px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.v1-nav-item i {
+  font-style: normal;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.v1-nav-item.active {
+  color: var(--c-primary);
+}
+
+/* 状态组件 */
+.v1-state {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  padding: 32px 16px;
+  color: var(--c-text-weak);
+  text-align: center;
+  font-size: 14px;
+}
+
+.v1-state-icon {
+  font-size: 30px;
+}
+
+.v1-error {
+  color: var(--c-danger);
+}
+
+.v1-spinner {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--c-primary-bg);
+  border-top-color: var(--c-primary);
+  border-radius: 50%;
+  animation: v1-spin 0.8s linear infinite;
+}
+
+@keyframes v1-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.v1-btn {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--c-primary);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.v1-btn:disabled {
+  background: #c7cfea;
+  cursor: not-allowed;
+}
+
+.v1-btn.secondary {
+  background: var(--c-primary-bg);
+  color: var(--c-text-secondary);
+}
+
+.v1-btn.danger {
+  background: var(--c-danger);
+}
+
+/* 验证页卡片（复用设计系统） */
+.v1-panel {
+  padding: 16px;
+  margin: 12px 16px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-card);
+  background: var(--c-bg);
+}
+
+.v1-panel h2 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+.v1-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f1f3;
+  font-size: 14px;
+}
+
+.v1-row:last-child {
+  border-bottom: none;
+}
+
+.v1-row .k {
+  color: var(--c-text-secondary);
+}
+
+.v1-row .v {
+  font-weight: 600;
+  text-align: right;
+}
+
+.v1-row .v.ok { color: var(--c-success); }
+.v1-row .v.bad { color: var(--c-danger); }
+.v1-row .v.warn { color: var(--c-warning); }
+.v1-row .v.pending { color: var(--c-text-weak); }
