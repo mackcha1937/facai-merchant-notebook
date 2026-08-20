@@ -403,6 +403,96 @@ button.preset:hover {
   cursor: pointer;
 }
 
+/* ===== 产品前端预览布局 ===== */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 10px 16px;
+}
+
+.app-title {
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.app-nav {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+}
+
+.app-nav-item {
+  padding: 6px 12px;
+  border-radius: 16px;
+  color: #374151;
+  text-decoration: none;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.app-nav-item.active {
+  background: #2563eb;
+  color: #fff;
+}
+
+.app-main {
+  min-height: 100vh;
+}
+
+.stats {
+  display: flex;
+  gap: 16px;
+}
+
+.stat {
+  flex: 1;
+  text-align: center;
+}
+
+.stat-num {
+  font-size: 32px;
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.stat-label {
+  color: #666;
+  font-size: 13px;
+}
+
+.quick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.quick {
+  display: block;
+  padding: 16px 12px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  text-decoration: none;
+  color: #1f2328;
+  font-size: 14px;
+}
+
+.quick:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+
+.btn-link {
+  color: #2563eb;
+  text-decoration: none;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
 .footnote {
   color: #999;
   font-size: 12px;
