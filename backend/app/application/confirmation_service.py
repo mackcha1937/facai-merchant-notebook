@@ -159,8 +159,8 @@ def _do_consume_service(db: Session, customer: Customer, action, proposal) -> di
             raise DomainError("该客户有多张同类套餐卡，请选择使用哪一张")
         package = packages[0]
 
-    validate_consume_quantity(package.total_count, package.used_count, quantity)
-    package.used_count += quantity
+    used = package_repo.compute_used_count(db, package)
+    validate_consume_quantity(package.total_count, used, quantity)
 
     ledger_repo.create_ledger_entry(
         db,
@@ -175,10 +175,11 @@ def _do_consume_service(db: Session, customer: Customer, action, proposal) -> di
         original_input=proposal.original_input,
         agent_prompt_version=proposal.prompt_version,
     )
-    remaining = package.total_count - package.used_count
+    new_used = used + quantity
+    remaining = package.total_count - new_used
     return {
         "type": "consume_service",
-        "message": f"已累计使用 {package.used_count}/{package.total_count} 次，还剩 {remaining} 次。",
+        "message": f"已累计使用 {new_used}/{package.total_count} 次，还剩 {remaining} 次。",
         "package_id": package.id,
         "remaining_count": remaining,
     }

@@ -11,14 +11,14 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-def list_customers(db: Session, q: str | None = None) -> list[Customer]:
+def list_customers(db: Session, search: str | None = None) -> list[Customer]:
     stmt = (
         select(Customer)
         .where(Customer.deleted_at.is_(None))
         .options(selectinload(Customer.aliases))
     )
-    if q and q.strip():
-        like = f"%{q.strip()}%"
+    if search and search.strip():
+        like = f"%{search.strip()}%"
         alias_ids = select(CustomerAlias.customer_id).where(
             CustomerAlias.alias.like(like),
             CustomerAlias.deleted_at.is_(None),

@@ -66,7 +66,7 @@ def test_confirm_create_package(db_session):
     pkgs = package_repo.list_packages_for_customer(db_session, cust.id)
     assert len(pkgs) == 1
     assert pkgs[0].total_count == 5
-    assert pkgs[0].used_count == 0
+    assert package_repo.compute_used_count(db_session, pkgs[0]) == 0
 
 
 def test_confirm_consume_single_card(db_session):
@@ -81,7 +81,7 @@ def test_confirm_consume_single_card(db_session):
         db_session, pid, _req(customer_id=cust.id, actions=[{"type": "consume_service", "service_id": svc.id, "quantity": 2}])
     )
     assert "已累计使用 2/5 次，还剩 3 次" in out["results"][0]["message"]
-    assert package_repo.get_package(db_session, pkg.id).used_count == 2
+    assert package_repo.compute_used_count(db_session, package_repo.get_package(db_session, pkg.id)) == 2
 
 
 def test_consume_insufficient_balance_rejected(db_session):
@@ -133,7 +133,7 @@ def test_consume_multiple_cards_requires_selection(db_session):
         _req(customer_id=cust.id, actions=[{"type": "consume_service", "service_id": svc.id, "quantity": 1, "package_id": p1.id}]),
     )
     assert out["status"] == "confirmed"
-    assert package_repo.get_package(db_session, p1.id).used_count == 1
+    assert package_repo.compute_used_count(db_session, package_repo.get_package(db_session, p1.id)) == 1
 
 
 def test_one_time_service_does_not_change_package(db_session):
@@ -148,7 +148,7 @@ def test_one_time_service_does_not_change_package(db_session):
         db_session, pid, _req(customer_id=cust.id, actions=[{"type": "record_one_time_service", "service_id": svc.id, "quantity": 1}])
     )
     assert "已消费 1 次 面部清洁 服务" in out["results"][0]["message"]
-    assert package_repo.get_package(db_session, pkg.id).used_count == 1  # 未变
+    assert package_repo.compute_used_count(db_session, package_repo.get_package(db_session, pkg.id)) == 1  # 未变
 
 
 def test_product_purchase(db_session):

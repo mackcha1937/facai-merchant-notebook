@@ -26,7 +26,7 @@ def test_used_cannot_exceed_total_on_update(client):
         f"/api/customers/{cust['id']}/packages",
         json={"service_id": svc["id"], "total_count": 5},
     ).json()["id"]
-    resp = client.patch(f"/api/packages/{pid}", json={"used_count": 6})
+    resp = client.patch(f"/api/packages/{pid}", json={"opening_used_count": 6})
     assert resp.status_code == 400
 
 

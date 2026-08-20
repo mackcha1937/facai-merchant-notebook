@@ -12,6 +12,11 @@ from app.schemas.package import PackageCreate, PackageUpdate
 VALID_PACKAGE_STATUSES = {"active", "exhausted", "inactive"}
 
 
+def _to_dict(db: Session, package) -> dict:
+    used = package_repo.compute_used_count(db, package)
+    return serializers.package_to_dict(package, used)
+
+
 def create_package(db: Session, customer_id: int, data: PackageCreate) -> dict:
     customer = customer_repo.get_customer(db, customer_id)
     if customer is None:
@@ -22,13 +27,13 @@ def create_package(db: Session, customer_id: int, data: PackageCreate) -> dict:
     if service.status != "active":
         raise DomainError("已停用或删除的服务不能建立新套餐")
 
-    total, _ = validate_package_counts(data.total_count, 0)
+    total, opening = validate_package_counts(data.total_count, data.opening_used_count)
     package = package_repo.create_package(
-        db, customer_id, service.id, total, 0, data.price_cents, data.purchased_on
+        db, customer_id, service.id, total, opening, data.price_cents, data.purchased_on
     )
     package.service = service
     serializers.save(db)
-    return serializers.package_to_dict(package)
+    return _to_dict(db, package)
 
 
 def update_package(db: Session, package_id: int, data: PackageUpdate) -> dict:
@@ -46,10 +51,14 @@ def update_package(db: Session, package_id: int, data: PackageUpdate) -> dict:
         package.service = new_service
 
     total = data.total_count if data.total_count is not None else package.total_count
-    used = data.used_count if data.used_count is not None else package.used_count
-    total, used = validate_package_counts(total, used)
+    opening = (
+        data.opening_used_count
+        if data.opening_used_count is not None
+        else package.opening_used_count
+    )
+    total, opening = validate_package_counts(total, opening)
     package.total_count = total
-    package.used_count = used
+    package.opening_used_count = opening
 
     if data.price_cents is not None:
         package.price_cents = data.price_cents
@@ -61,7 +70,7 @@ def update_package(db: Session, package_id: int, data: PackageUpdate) -> dict:
         package.status = data.status
 
     serializers.save(db)
-    return serializers.package_to_dict(package)
+    return _to_dict(db, package)
 
 
 def delete_package(db: Session, package_id: int) -> dict:
@@ -79,4 +88,4 @@ def restore_package(db: Session, package_id: int) -> dict:
         raise NotFoundError("套餐不存在")
     package_repo.restore_package(db, package)
     serializers.save(db)
-    return serializers.package_to_dict(package)
+    return _to_dict(db, package)

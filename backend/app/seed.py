@@ -32,7 +32,7 @@ def seed() -> None:
                     Package(
                         service_id=svc.id,
                         total_count=total,
-                        used_count=used,
+                        opening_used_count=used,
                         price_cents=price_cents,
                         purchased_on=purchased_on,
                         status="active",

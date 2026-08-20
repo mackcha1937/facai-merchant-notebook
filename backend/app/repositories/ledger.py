@@ -22,6 +22,24 @@ def list_ledger_for_customer(db: Session, customer_id: int) -> list[LedgerEntry]
     )
 
 
+def list_ledger_for_customer_service(
+    db: Session, customer_id: int, service_id: int
+) -> list[LedgerEntry]:
+    """某客户某服务的未删除记录（用于服务详情历史）。"""
+    return list(
+        db.scalars(
+            select(LedgerEntry)
+            .where(
+                LedgerEntry.customer_id == customer_id,
+                LedgerEntry.service_id == service_id,
+                LedgerEntry.deleted_at.is_(None),
+            )
+            .options(selectinload(LedgerEntry.service))
+            .order_by(LedgerEntry.occurred_on.desc(), LedgerEntry.id.desc())
+        ).all()
+    )
+
+
 def get_ledger_entry(db: Session, entry_id: int) -> LedgerEntry | None:
     return db.scalar(
         select(LedgerEntry).where(
