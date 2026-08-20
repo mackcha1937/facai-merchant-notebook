@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import AppHeader from '../../components/v1/AppHeader.jsx'
 import BottomNavigation from '../../components/v1/BottomNavigation.jsx'
 import AgentProposalCard from '../../components/v1/AgentProposalCard.jsx'
@@ -41,6 +42,7 @@ export default function ChatHome() {
     <div className="v1-app">
       <AppHeader />
       <div className="v1-content v1-chat">
+        <Link to="/verify/stage-4" className="v1-accept-link">🧪 验收总览入口 →</Link>
         <div className="v1-day">今天</div>
         {messages.map((m) => {
           if (m.kind === 'proposal') {
