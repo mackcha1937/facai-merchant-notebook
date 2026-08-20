@@ -9,13 +9,13 @@ import './styles/global.css'
 import ChatHome from './pages/v1/ChatHome.jsx'
 import VerifyStage0 from './pages/v1/VerifyStage0.jsx'
 import VerifyStage1 from './pages/v1/VerifyStage1.jsx'
+import VerifyStage2 from './pages/v1/VerifyStage2.jsx'
 import CustomerSheet from './pages/v1/CustomerSheet.jsx'
 import Settings from './pages/v1/Settings.jsx'
+import PromptSettings from './pages/v1/PromptSettings.jsx'
 // 旧验证页（保留，供对照）
-import VerifyStage2 from './pages/VerifyStage2.jsx'
 import VerifyStage3 from './pages/VerifyStage3.jsx'
 import VerifyStage4 from './pages/VerifyStage4.jsx'
-import SettingsPrompt from './pages/SettingsPrompt.jsx'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -29,7 +29,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <Route path="/verify/stage-2" element={<VerifyStage2 />} />
         <Route path="/verify/stage-3" element={<VerifyStage3 />} />
         <Route path="/verify/stage-4" element={<VerifyStage4 />} />
-        <Route path="/settings/prompt" element={<SettingsPrompt />} />
+        <Route path="/settings/prompt" element={<PromptSettings />} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>,
