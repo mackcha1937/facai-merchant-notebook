@@ -72,6 +72,8 @@ export const api = {
   cancelProposal: (id) => request(`/api/agent/proposals/${id}/cancel`, { method: 'POST' }),
   confirmProposal: (id, data) =>
     request(`/api/agent/proposals/${id}/confirm`, { method: 'POST', body: JSON.stringify(data) }),
+  precheckProposal: (id, data) =>
+    request(`/api/agent/proposals/${id}/precheck`, { method: 'POST', body: JSON.stringify(data) }),
 
   // 提示词管理
   getPrompt: () => request('/api/settings/prompt'),

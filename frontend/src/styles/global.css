@@ -876,3 +876,60 @@
 .v1-test-btn:hover {
   background: var(--c-primary-bg);
 }
+
+.v1-edit-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.v1-edit-row label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--c-text-secondary);
+}
+
+.v1-edit-row input,
+.v1-edit-row select {
+  padding: 7px 8px;
+  border: 1px solid var(--c-border);
+  border-radius: 9px;
+  font-size: 13px;
+}
+
+.v1-action-preview {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--c-success-bg);
+  color: var(--c-success);
+  font-size: 13px;
+}
+
+.v1-action-error {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fdecec;
+  color: var(--c-danger);
+  font-size: 13px;
+}
+
+.v1-success-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--c-success);
+  font-weight: 700;
+}
+
+.v1-success-dot::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}

@@ -6,7 +6,7 @@ from app.agent import agent_service, matching
 from app.application import confirmation_service, proposal_service
 from app.core.database import get_db
 from app.repositories import customers as customer_repo
-from app.schemas.agent import ConfirmRequest, FuzzySearchRequest, InterpretRequest
+from app.schemas.agent import ConfirmRequest, FuzzySearchRequest, InterpretRequest, PrecheckRequest
 
 router = APIRouter(prefix="/api", tags=["agent"])
 
@@ -24,6 +24,11 @@ def get_proposal(proposal_id: int, db: Session = Depends(get_db)):
 @router.post("/agent/proposals/{proposal_id}/cancel")
 def cancel_proposal(proposal_id: int, db: Session = Depends(get_db)):
     return proposal_service.cancel_proposal(db, proposal_id)
+
+
+@router.post("/agent/proposals/{proposal_id}/precheck")
+def precheck_proposal(proposal_id: int, data: PrecheckRequest, db: Session = Depends(get_db)):
+    return confirmation_service.precheck(db, proposal_id, data)
 
 
 @router.post("/agent/proposals/{proposal_id}/confirm")

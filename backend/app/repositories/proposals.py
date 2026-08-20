@@ -30,3 +30,12 @@ def get_proposal(db: Session, proposal_id: int) -> AgentProposal | None:
 def set_status(db: Session, proposal: AgentProposal, status: str) -> None:
     proposal.status = status
     db.flush()
+
+
+def mark_confirmed(db: Session, proposal: AgentProposal) -> None:
+    """标记建议为已确认，并记录确认时间（幂等：只能从 pending 确认一次）。"""
+    from datetime import datetime, timezone
+
+    proposal.status = "confirmed"
+    proposal.confirmed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    db.flush()
