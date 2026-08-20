@@ -13,6 +13,7 @@ venv/
 
 # 本地数据库文件
 data/
+backups/
 
 # 系统文件
 .DS_Store
