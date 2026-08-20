@@ -5,6 +5,7 @@ from pydantic import BaseModel
 class PackageCreate(BaseModel):
     service_id: int
     total_count: int
+    opening_used_count: int = 0
     price_cents: int | None = None
     purchased_on: str | None = None
 
@@ -12,7 +13,7 @@ class PackageCreate(BaseModel):
 class PackageUpdate(BaseModel):
     service_id: int | None = None
     total_count: int | None = None
-    used_count: int | None = None
+    opening_used_count: int | None = None
     price_cents: int | None = None
     purchased_on: str | None = None
     status: str | None = None  # active / exhausted / inactive

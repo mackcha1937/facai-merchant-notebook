@@ -26,7 +26,7 @@ def test_restore_customer_keeps_package_and_balance(db_session):
     packages = package_repo.list_packages_for_customer(db_session, cust.id)
     assert len(packages) == 1
     assert packages[0].total_count == 5
-    assert packages[0].used_count == 2  # 余额未变
+    assert package_repo.compute_used_count(db_session, packages[0]) == 2  # 余额未变
 
 
 def test_restore_package_keeps_balance(db_session):
@@ -40,7 +40,7 @@ def test_restore_package_keeps_balance(db_session):
     restored = package_repo.get_package(db_session, pkg.id)
     assert restored is not None
     assert restored.total_count == 5
-    assert restored.used_count == 2  # 余额未变
+    assert package_repo.compute_used_count(db_session, restored) == 2  # 余额未变
 
 
 def test_deleted_service_not_in_list(db_session):

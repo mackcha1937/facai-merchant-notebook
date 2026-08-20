@@ -29,8 +29,14 @@ class ConfirmAction(BaseModel):
     price_cents: int | None = None
     total_count: int | None = None
     purchased_on: str | None = None
+    occurred_on: str | None = None
 
 
 class ConfirmRequest(BaseModel):
+    customer: ConfirmCustomer
+    actions: list[ConfirmAction] = Field(default_factory=list)
+
+
+class PrecheckRequest(BaseModel):
     customer: ConfirmCustomer
     actions: list[ConfirmAction] = Field(default_factory=list)

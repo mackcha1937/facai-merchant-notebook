@@ -20,9 +20,13 @@ async function request(path, options = {}) {
 
 export const api = {
   // 客户
-  getCustomers: (q) =>
-    request(`/api/customers${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+  getCustomers: (search) =>
+    request(`/api/customers${search ? `?search=${encodeURIComponent(search)}` : '?sort=last_consumed_desc'}`),
   getCustomer: (id) => request(`/api/customers/${id}`),
+  getCustomerOverview: (id) => request(`/api/customers/${id}/overview`),
+  getCustomerServices: (id) => request(`/api/customers/${id}/services`),
+  getCustomerServiceDetail: (id, serviceId) =>
+    request(`/api/customers/${id}/services/${serviceId}`),
   createCustomer: (data) =>
     request('/api/customers', { method: 'POST', body: JSON.stringify(data) }),
   updateCustomer: (id, data) =>
@@ -68,6 +72,8 @@ export const api = {
   cancelProposal: (id) => request(`/api/agent/proposals/${id}/cancel`, { method: 'POST' }),
   confirmProposal: (id, data) =>
     request(`/api/agent/proposals/${id}/confirm`, { method: 'POST', body: JSON.stringify(data) }),
+  precheckProposal: (id, data) =>
+    request(`/api/agent/proposals/${id}/precheck`, { method: 'POST', body: JSON.stringify(data) }),
 
   // 提示词管理
   getPrompt: () => request('/api/settings/prompt'),

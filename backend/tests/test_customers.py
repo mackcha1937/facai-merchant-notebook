@@ -18,9 +18,9 @@ def test_create_and_list_customer(client):
 
 def test_search_by_alias_and_name(client):
     _create_customer(client, "小红", ["红姐"])
-    assert len(client.get("/api/customers", params={"q": "红姐"}).json()) == 1
-    assert len(client.get("/api/customers", params={"q": "小红"}).json()) == 1
-    assert len(client.get("/api/customers", params={"q": "不存在"}).json()) == 0
+    assert len(client.get("/api/customers", params={"search": "红姐"}).json()) == 1
+    assert len(client.get("/api/customers", params={"search": "小红"}).json()) == 1
+    assert len(client.get("/api/customers", params={"search": "不存在"}).json()) == 0
 
 
 def test_delete_then_not_in_list_then_restore(client):

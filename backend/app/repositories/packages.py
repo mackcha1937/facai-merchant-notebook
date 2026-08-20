@@ -1,10 +1,10 @@
 """套餐卡数据访问。"""
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.infrastructure.models import Package
+from app.infrastructure.models import LedgerEntry, Package
 
 
 def _utcnow() -> datetime:
@@ -60,7 +60,7 @@ def create_package(
     customer_id: int,
     service_id: int,
     total_count: int,
-    used_count: int,
+    opening_used_count: int,
     price_cents: int | None,
     purchased_on: str | None,
 ) -> Package:
@@ -68,7 +68,7 @@ def create_package(
         customer_id=customer_id,
         service_id=service_id,
         total_count=total_count,
-        used_count=used_count,
+        opening_used_count=opening_used_count,
         price_cents=price_cents,
         purchased_on=purchased_on,
         status="active",
@@ -76,6 +76,39 @@ def create_package(
     db.add(package)
     db.flush()
     return package
+
+
+def compute_used_count(db: Session, package: Package) -> int:
+    """权威累计已用 = opening_used_count + SUM(未删除的 package_consumption.quantity)。"""
+    consumed = db.scalar(
+        select(func.coalesce(func.sum(LedgerEntry.quantity), 0)).where(
+            LedgerEntry.package_id == package.id,
+            LedgerEntry.entry_type == "package_consumption",
+            LedgerEntry.deleted_at.is_(None),
+        )
+    ) or 0
+    return package.opening_used_count + consumed
+
+
+def compute_used_counts(db: Session, packages: list[Package]) -> dict[int, int]:
+    """批量计算多个套餐的权威累计已用，避免 N+1。"""
+    if not packages:
+        return {}
+    ids = [p.id for p in packages]
+    rows = db.execute(
+        select(
+            LedgerEntry.package_id,
+            func.coalesce(func.sum(LedgerEntry.quantity), 0),
+        )
+        .where(
+            LedgerEntry.package_id.in_(ids),
+            LedgerEntry.entry_type == "package_consumption",
+            LedgerEntry.deleted_at.is_(None),
+        )
+        .group_by(LedgerEntry.package_id)
+    ).all()
+    consumed_by_id = {package_id: total for package_id, total in rows}
+    return {p.id: p.opening_used_count + consumed_by_id.get(p.id, 0) for p in packages}
 
 
 def soft_delete_package(db: Session, package: Package) -> None:

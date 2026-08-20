@@ -1,7 +1,8 @@
 """SQLAlchemy ORM 数据模型。
 
 字段设计遵循 03 文档第 4 节核心数据模型。
-剩余次数不落库，由 total_count - used_count 计算，避免字段矛盾。
+剩余次数不落库：权威累计已用 = opening_used_count + SUM(未删除核销记录)，
+剩余次数 = total_count - 权威累计已用。删除/恢复核销记录时余额自动重算。
 价格使用整数“分”存储，避免浮点误差。
 """
 from datetime import datetime, timezone
@@ -64,7 +65,7 @@ class Package(Base):
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), nullable=False)
     service_id: Mapped[int] = mapped_column(ForeignKey("services.id"), nullable=False)
     total_count: Mapped[int] = mapped_column(Integer, nullable=False)
-    used_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    opening_used_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     price_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
     purchased_on: Mapped[str | None] = mapped_column(String(20), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
@@ -113,3 +114,4 @@ class AgentProposal(Base):
     prompt_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

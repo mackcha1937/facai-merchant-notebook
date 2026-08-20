@@ -20,19 +20,38 @@ def service_to_dict(service: Service) -> dict:
     return {"id": service.id, "name": service.name, "status": service.status}
 
 
-def package_to_dict(package: Package) -> dict:
+def derive_package_status(package: Package, remaining: int) -> str:
+    """套餐状态由权威余额派生：手动停用为 inactive，剩余0为 exhausted，否则 active。"""
+    if package.status == "inactive":
+        return "inactive"
+    return "exhausted" if remaining <= 0 else "active"
+
+
+def package_to_dict(package: Package, used_count: int | None = None) -> dict:
+    if used_count is None:
+        used_count = package.opening_used_count
+    remaining = remaining_count(package.total_count, used_count)
     return {
         "id": package.id,
         "customer_id": package.customer_id,
         "service_id": package.service_id,
         "service_name": package.service.name if package.service else None,
         "total_count": package.total_count,
-        "used_count": package.used_count,
-        "remaining_count": remaining_count(package.total_count, package.used_count),
+        "opening_used_count": package.opening_used_count,
+        "used_count": used_count,
+        "remaining_count": remaining,
         "price_cents": package.price_cents,
         "purchased_on": package.purchased_on,
-        "status": package.status,
+        "status": derive_package_status(package, remaining),
     }
+
+
+def packages_to_dicts(db, packages: list[Package]) -> list[dict]:
+    """批量序列化套餐，并带权威累计已用（避免 N+1）。"""
+    from app.repositories.packages import compute_used_counts
+
+    used_counts = compute_used_counts(db, packages)
+    return [package_to_dict(p, used_counts.get(p.id, p.opening_used_count)) for p in packages]
 
 
 def ledger_to_dict(entry: LedgerEntry) -> dict:

@@ -10,9 +10,10 @@ from app.repositories import packages as package_repo
 from app.schemas.customer import CustomerCreate, CustomerUpdate
 
 
-def list_customers(db: Session, q: str | None = None) -> list[dict]:
-    customers = customer_repo.list_customers(db, q)
-    return [serializers.customer_to_dict(c) for c in customers]
+def list_customers(db: Session, search: str | None = None, sort: str = "last_consumed_desc") -> list[dict]:
+    from app.application import customer_read_service
+
+    return customer_read_service.list_customer_summaries(db, search, sort)
 
 
 def create_customer(db: Session, data: CustomerCreate) -> dict:
@@ -30,7 +31,7 @@ def get_customer_detail(db: Session, customer_id: int) -> dict:
     packages = package_repo.list_packages_for_customer(db, customer_id)
     entries = ledger_repo.list_ledger_for_customer(db, customer_id)
     result = serializers.customer_to_dict(customer)
-    result["packages"] = [serializers.package_to_dict(p) for p in packages]
+    result["packages"] = serializers.packages_to_dicts(db, packages)
     result["ledger"] = [serializers.ledger_to_dict(e) for e in entries]
     return result
 

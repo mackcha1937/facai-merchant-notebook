@@ -57,4 +57,5 @@ def test_unconfirmed_proposal_does_not_write(db_session):
 
     assert len(customer_repo.list_customers(db_session)) == before_customers
     assert len(package_repo.list_packages_for_customer(db_session, cust.id)) == before_packages
-    assert package_repo.get_package(db_session, package_repo.list_packages_for_customer(db_session, cust.id)[0].id).used_count == 0
+    pkg = package_repo.list_packages_for_customer(db_session, cust.id)[0]
+    assert package_repo.compute_used_count(db_session, pkg) == 0
