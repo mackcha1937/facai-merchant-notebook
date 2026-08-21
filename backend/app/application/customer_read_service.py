@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.application import serializers
+from app.core.tenant import get_current_tenant_id
 from app.domain.errors import NotFoundError
 from app.infrastructure.models import LedgerEntry, Package
 from app.repositories import customers as customer_repo
@@ -39,6 +40,7 @@ def _last_consumption(db: Session, customer_id: int, service_id: int | None = No
             LedgerEntry.customer_id == customer_id,
             LedgerEntry.entry_type.in_(_CONSUME_TYPES),
             LedgerEntry.deleted_at.is_(None),
+            LedgerEntry.tenant_id == get_current_tenant_id(),
         )
         .options(selectinload(LedgerEntry.service))
     )
@@ -49,10 +51,13 @@ def _last_consumption(db: Session, customer_id: int, service_id: int | None = No
 
 
 def _service_ids_for_customer(db: Session, customer_id: int) -> set[int]:
+    tenant_id = get_current_tenant_id()
     pkg_ids = set(
         db.scalars(
             select(Package.service_id).where(
-                Package.customer_id == customer_id, Package.deleted_at.is_(None)
+                Package.customer_id == customer_id,
+                Package.deleted_at.is_(None),
+                Package.tenant_id == tenant_id,
             )
         ).all()
     )
@@ -62,6 +67,7 @@ def _service_ids_for_customer(db: Session, customer_id: int) -> set[int]:
                 LedgerEntry.customer_id == customer_id,
                 LedgerEntry.service_id.is_not(None),
                 LedgerEntry.deleted_at.is_(None),
+                LedgerEntry.tenant_id == tenant_id,
             )
         ).all()
     )
@@ -139,7 +145,11 @@ def get_customer_overview(db: Session, customer_id: int) -> dict:
     recent = list(
         db.scalars(
             select(LedgerEntry)
-            .where(LedgerEntry.customer_id == customer_id, LedgerEntry.deleted_at.is_(None))
+            .where(
+                LedgerEntry.customer_id == customer_id,
+                LedgerEntry.deleted_at.is_(None),
+                LedgerEntry.tenant_id == get_current_tenant_id(),
+            )
             .options(selectinload(LedgerEntry.service))
             .order_by(LedgerEntry.occurred_on.desc(), LedgerEntry.id.desc())
             .limit(5)

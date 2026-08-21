@@ -49,6 +49,8 @@ def stage1_status():
             "tenant_count": tenant_count,
             "owner_count": owner_count,
             "null_tenant_customers": null_tenant_customers,
+            "product_draft_count": cur.execute("SELECT COUNT(*) FROM products WHERE lifecycle_status='draft'").fetchone()[0],
+            "ledger_product_backfill": cur.execute("SELECT COUNT(*) FROM ledger_entries WHERE product_id IS NOT NULL").fetchone()[0],
             "v1_baseline": {
                 "customer_count": customer_count,
                 "package_count": package_count,

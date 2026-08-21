@@ -130,6 +130,7 @@ class LedgerEntry(Base):
     entry_type: Mapped[str] = mapped_column(String(30), nullable=False)
     package_id: Mapped[int | None] = mapped_column(ForeignKey("packages.id"), nullable=True)
     service_id: Mapped[int | None] = mapped_column(ForeignKey("services.id"), nullable=True)
+    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"), nullable=True)
     product_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     price_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -302,6 +303,7 @@ class ConversationSession(Base):
     __tablename__ = "conversation_sessions"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(Integer, nullable=False)
     thread_id: Mapped[int] = mapped_column(Integer, nullable=False)
     session_date: Mapped[str | None] = mapped_column(String(20), nullable=True)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -313,6 +315,7 @@ class Message(Base):
     __tablename__ = "messages"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(Integer, nullable=False)
     session_id: Mapped[int] = mapped_column(Integer, nullable=False)
     role: Mapped[str] = mapped_column(String(20), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
@@ -324,6 +327,7 @@ class MessageBlock(Base):
     __tablename__ = "message_blocks"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(Integer, nullable=False)
     message_id: Mapped[int] = mapped_column(Integer, nullable=False)
     block_type: Mapped[str] = mapped_column(String(40), nullable=False)
     payload_json: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -336,6 +340,7 @@ class EntityMention(Base):
     __tablename__ = "entity_mentions"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(Integer, nullable=False)
     message_id: Mapped[int] = mapped_column(Integer, nullable=False)
     entity_type: Mapped[str] = mapped_column(String(30), nullable=False)
     entity_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -359,6 +364,7 @@ class ContextSummary(Base):
     __tablename__ = "context_summaries"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(Integer, nullable=False)
     session_id: Mapped[int] = mapped_column(Integer, nullable=False)
     topics: Mapped[str | None] = mapped_column(Text, nullable=True)
     entity_ids: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -515,6 +521,7 @@ class EvaluationCaseResult(Base):
     __tablename__ = "evaluation_case_results"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(Integer, nullable=False)
     run_id: Mapped[int] = mapped_column(Integer, nullable=False)
     case_id: Mapped[str] = mapped_column(String(100), nullable=False)
     output_json: Mapped[str | None] = mapped_column(Text, nullable=True)

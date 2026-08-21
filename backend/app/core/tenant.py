@@ -1,18 +1,41 @@
-"""租户上下文：所有仓储查询强制带 tenant_id。
+"""租户与当前用户上下文（fail closed）。
 
-本地 MVP 默认租户 id=1；未来多租户通过 ContextVar 注入当前租户。
-禁止先按对象 ID 查询再在应用层判断租户。
+- 禁止 ContextVar 静默默认 tenant=1：缺少上下文时按 fail closed 处理；
+- 正式登录未实现前，允许服务端配置的本地默认 owner（仅开发环境）；
+- 不接受客户端任意传入 X-Tenant-ID 或角色冒充。
 """
 from contextvars import ContextVar
 
-DEFAULT_TENANT_ID = 1
+from app.core.config import get_settings
+from app.domain.errors import DomainError
 
-_current_tenant_id: ContextVar[int] = ContextVar("current_tenant_id", default=DEFAULT_TENANT_ID)
+_current_tenant_id: ContextVar[int | None] = ContextVar("current_tenant_id", default=None)
+_current_user_role: ContextVar[str | None] = ContextVar("current_user_role", default=None)
 
 
 def get_current_tenant_id() -> int:
-    return _current_tenant_id.get()
+    tid = _current_tenant_id.get()
+    if tid is not None:
+        return tid
+    settings = get_settings()
+    if settings.local_dev_owner_enabled:
+        return settings.local_default_tenant_id
+    raise DomainError("缺少租户上下文，拒绝业务请求")
 
 
-def set_current_tenant_id(tenant_id: int):
+def get_current_role() -> str:
+    role = _current_user_role.get()
+    if role is not None:
+        return role
+    settings = get_settings()
+    if settings.local_dev_owner_enabled:
+        return settings.local_default_owner_role
+    raise DomainError("缺少用户上下文，拒绝请求")
+
+
+def set_current_tenant_id(tenant_id: int | None):
     return _current_tenant_id.set(tenant_id)
+
+
+def set_current_role(role: str | None):
+    return _current_user_role.set(role)

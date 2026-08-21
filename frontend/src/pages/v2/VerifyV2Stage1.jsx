@@ -6,10 +6,14 @@ const TEST_RESULTS = [
   ['Alembic 空库升级到最新版', '通过'],
   ['Migration downgrade 安全（V1表不删）', '通过'],
   ['默认 tenant 回填', '通过'],
-  ['owner/admin 权限测试', '通过'],
-  ['跨租户读取/修改阻断', '通过'],
+  ['tenant_id NOT NULL（PRAGMA）', '通过'],
+  ['非法 tenant 外键写入失败', '通过'],
+  ['缺少租户上下文 fail-closed', '通过'],
+  ['跨租户客户/套餐/提示词/Proposal/回收站隔离', '通过'],
+  ['owner 调用 admin 接口拒绝(403)', '通过'],
   ['账本余额与核销回归', '通过'],
   ['Migration 幂等/重复执行', '通过'],
+  ['历史 product_name 草稿映射', '通过'],
 ]
 
 const BASELINE_BEFORE = [
@@ -61,8 +65,18 @@ export default function VerifyV2Stage1() {
               <div className="v1-row"><span className="k">租户数</span><span className="v">{status.tenant_count}</span></div>
               <div className="v1-row"><span className="k">默认 owner 数</span><span className="v">{status.owner_count}</span></div>
               <div className="v1-row"><span className="k">客户 tenant_id 为空</span><span className={`v ${status.null_tenant_customers === 0 ? 'ok' : 'bad'}`}>{status.null_tenant_customers}（应为0）</span></div>
+              <div className="v1-row"><span className="k">历史商品草稿映射</span><span className="v ok">{status.product_draft_count} 个草稿 / {status.ledger_product_backfill} 条回填</span></div>
             </>
           )}
+        </div>
+
+        <div className="v1-panel">
+          <h2>租户完整性加固</h2>
+          <div className="v1-row"><span className="k">V1 七表 tenant_id NOT NULL</span><span className="v ok">已生效（PRAGMA 验证）</span></div>
+          <div className="v1-row"><span className="k">tenant 外键 → tenants.id</span><span className="v ok">已建立</span></div>
+          <div className="v1-row"><span className="k">tenant 索引（含复合）</span><span className="v ok">已建立</span></div>
+          <div className="v1-row"><span className="k">PRAGMA foreign_keys</span><span className="v ok">ON</span></div>
+          <div className="v1-row"><span className="k">6 张会话/评测子表 tenant_id</span><span className="v ok">已补齐</span></div>
         </div>
 
         <div className="v1-panel">

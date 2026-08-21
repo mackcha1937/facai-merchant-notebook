@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.application import customer_read_service, customer_service
 from app.core.database import get_db
+from app.core.rbac import require_owner
 from app.schemas.customer import CustomerCreate, CustomerUpdate
 
 router = APIRouter(prefix="/api/customers", tags=["customers"])
@@ -20,6 +21,7 @@ def list_customers(
 
 @router.post("", status_code=201)
 def create_customer(data: CustomerCreate, db: Session = Depends(get_db)):
+    require_owner()
     return customer_service.create_customer(db, data)
 
 
@@ -45,14 +47,17 @@ def get_customer_service_detail(customer_id: int, service_id: int, db: Session =
 
 @router.patch("/{customer_id}")
 def update_customer(customer_id: int, data: CustomerUpdate, db: Session = Depends(get_db)):
+    require_owner()
     return customer_service.update_customer(db, customer_id, data)
 
 
 @router.delete("/{customer_id}")
 def delete_customer(customer_id: int, db: Session = Depends(get_db)):
+    require_owner()
     return customer_service.delete_customer(db, customer_id)
 
 
 @router.post("/{customer_id}/restore")
 def restore_customer(customer_id: int, db: Session = Depends(get_db)):
+    require_owner()
     return customer_service.restore_customer(db, customer_id)

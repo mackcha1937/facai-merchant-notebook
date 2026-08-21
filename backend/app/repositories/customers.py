@@ -24,6 +24,7 @@ def list_customers(db: Session, search: str | None = None) -> list[Customer]:
         alias_ids = select(CustomerAlias.customer_id).where(
             CustomerAlias.alias.like(like),
             CustomerAlias.deleted_at.is_(None),
+            CustomerAlias.tenant_id == tenant_id,
         )
         stmt = stmt.where(
             or_(Customer.display_name.like(like), Customer.id.in_(alias_ids))
@@ -81,7 +82,9 @@ def update_customer(
                 alias.deleted_at = _utcnow()
         for name in new_aliases:
             if name not in existing_by_name:
-                customer.aliases.append(CustomerAlias(alias=name))
+                customer.aliases.append(
+                    CustomerAlias(alias=name, tenant_id=get_current_tenant_id())
+                )
     db.flush()
     return customer
 

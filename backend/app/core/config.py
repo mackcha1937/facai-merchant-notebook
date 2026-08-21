@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     # 阶段0 模型验证开关（会产生真实模型费用，仅开发环境显式开启）
     enable_stage0_verify: bool = False
 
+    # 本地开发默认身份（正式登录未实现前）。生产环境应设为 False，缺失上下文时 fail closed。
+    local_dev_owner_enabled: bool = True
+    local_default_tenant_id: int = 1
+    local_default_owner_role: str = "owner"
+
     # 前端开发服务器跨域来源（多个用英文逗号分隔）
     cors_origins: str = "http://127.0.0.1:5173,http://localhost:5173"
 

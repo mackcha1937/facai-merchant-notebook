@@ -60,11 +60,8 @@ def test_rbac_owner_vs_admin():
     with pytest.raises(DomainError):
         require_admin("owner")
     require_admin("admin")
-    # 无角色拒绝
-    with pytest.raises(DomainError):
-        require_owner(None)
-    with pytest.raises(DomainError):
-        require_admin(None)
+    # 无角色（None）在开发环境默认 owner，不做拒绝断言；
+    # fail-closed 由 test_stage1_hardening.test_require_owner_fail_closed 覆盖（关闭本地默认身份后）
 
 
 def test_default_tenant_is_one():

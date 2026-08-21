@@ -11,10 +11,12 @@
 | 0002_tenant_user_invite | Tenant / User / Invite |
 | 0003_tenant_id_backfill | 7 张业务表加 tenant_id + 默认租户回填 |
 | 0004_customer_fact_product | CustomerFact / Product / ProductAlias |
-| 0005_knowledge | ProductKnowledgeVersion / ServiceKnowledgeVersion / KnowledgeDocument / EmbeddingRecord |
-| 0006_conversation | Thread / Session / Message / Block / Mention / PendingAction / ContextSummary / VoiceTurn |
-| 0007_recommendation | RecommendationRule / Recommendation / MessageDraft / FollowUpFeedback |
-| 0008_release | AIConfigDraft / PromptRelease / RagRelease / RecommendationRelease / EvaluationRun / EvaluationCaseResult / ReleaseAudit / OwnerAIFeedback |
+| 0005_knowledge | 知识版本 / 文档 / EmbeddingRecord |
+| 0006_conversation | 会话/语音 8 表 |
+| 0007_recommendation | 推荐 4 表 |
+| 0008_release | AI 发布治理 8 表 |
+| 0009_tenant_integrity_hardening | tenant_id NOT NULL + 外键 + 索引 + 6 子表 tenant_id 回填 |
+| 0010_product_name_migration | 历史 product_name → Product 草稿 + product_id 回填 |
 
 ## 执行结果（现有 V1 数据库）
 

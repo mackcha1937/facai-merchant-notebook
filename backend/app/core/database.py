@@ -1,11 +1,18 @@
 """SQLite 连接与会话管理。"""
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import BACKEND_ROOT, get_settings
 
 _engine = None
 _session_factory = None
+
+
+def _enable_sqlite_fk(dbapi_connection, _connection_record):
+    """每个连接启用 SQLite 外键约束。"""
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 
 def _ensure_data_dir() -> None:
@@ -22,6 +29,7 @@ def get_engine():
             settings.effective_database_url,
             connect_args={"check_same_thread": False},
         )
+        event.listen(_engine, "connect", _enable_sqlite_fk)
     return _engine
 
 

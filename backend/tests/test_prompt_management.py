@@ -1,4 +1,14 @@
 """提示词版本管理接口测试。"""
+import pytest
+
+from app.core.tenant import set_current_role
+
+
+@pytest.fixture(autouse=True)
+def _admin_role():
+    set_current_role("admin")
+    yield
+    set_current_role(None)
 
 
 def test_get_current_prompt_initialized(client):

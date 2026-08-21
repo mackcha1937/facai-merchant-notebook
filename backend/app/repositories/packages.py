@@ -98,6 +98,7 @@ def compute_used_count(db: Session, package: Package) -> int:
             LedgerEntry.package_id == package.id,
             LedgerEntry.entry_type == "package_consumption",
             LedgerEntry.deleted_at.is_(None),
+            LedgerEntry.tenant_id == package.tenant_id,
         )
     ) or 0
     return package.opening_used_count + consumed
@@ -107,6 +108,7 @@ def compute_used_counts(db: Session, packages: list[Package]) -> dict[int, int]:
     """批量计算多个套餐的权威累计已用，避免 N+1。"""
     if not packages:
         return {}
+    tenant_id = get_current_tenant_id()
     ids = [p.id for p in packages]
     rows = db.execute(
         select(
@@ -117,6 +119,7 @@ def compute_used_counts(db: Session, packages: list[Package]) -> dict[int, int]:
             LedgerEntry.package_id.in_(ids),
             LedgerEntry.entry_type == "package_consumption",
             LedgerEntry.deleted_at.is_(None),
+            LedgerEntry.tenant_id == tenant_id,
         )
         .group_by(LedgerEntry.package_id)
     ).all()
