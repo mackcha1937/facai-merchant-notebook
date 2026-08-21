@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     deepseek_api_key: str = ""
     model_request_timeout_seconds: float = 60.0
 
+    # 阶段0 模型验证开关（会产生真实模型费用，仅开发环境显式开启）
+    enable_stage0_verify: bool = False
+
     # 前端开发服务器跨域来源（多个用英文逗号分隔）
     cors_origins: str = "http://127.0.0.1:5173,http://localhost:5173"
 

@@ -91,18 +91,23 @@
 
 ---
 
-## 4. DeepSeek 模型真实验证结果（已执行）
+## 4. DeepSeek 模型真实验证结果（已执行，严格版 6 项）
 
-验证脚本：`backend/scripts/v2_stage0_verify_model.py`
+验证脚本：`backend/scripts/v2_stage0_verify_model.py`（接口受 `ENABLE_STAGE0_VERIFY` 开关 + 60秒冷却保护）
 
 | 验证项 | 结果 | 说明 |
 |---|---|---|
 | 模型 ID 可用性 | ✅ 通过 | `deepseek-v4-pro` 被官方接口接受 |
-| 结构化 JSON 输出 | ✅ 通过 | 能输出合法 JSON（customer_query/intent/items 字段正确） |
-| 超时行为 | ✅ 通过 | 极短超时正确抛出 TimeoutException（0.016s） |
-| 错误处理 | ✅ 通过 | 错误模型 ID 返回 HTTP 400 + 清晰错误信息 |
+| 结构化 JSON 输出 | ✅ 通过 | `response_format=json_object` + JSON Schema 全量校验 |
+| 工具调用 | ✅ 通过 | 返回 tool_calls，工具名/参数正确，无副作用 |
+| 流式响应 SSE | ✅ 通过 | 22 个内容增量 + [DONE] |
+| 超时行为 | ✅ 通过 | 仅捕获 httpx.TimeoutException 算通过 |
+| 错误模型处理 | ✅ 通过 | HTTP 400 + 明确模型不支持错误 |
 
-**关键发现**：官方接口错误信息明确返回 `The supported API model names are deepseek-v4-pro or deepseek-v4-flash`，即当前账户真实可用模型为 **deepseek-v4-pro** 和 **deepseek-v4-flash**。用户提供的目标名 `deepseek-v4-pro` 真实有效，无需更换。
+**关键发现**：
+1. 官方支持 `deepseek-v4-pro`、`deepseek-v4-flash`、`deepseek-v4-flash-vision-exp`；用户提供的 `deepseek-v4-pro` 真实有效。
+2. `deepseek-v4-pro` 是推理模型：流式先输出 `reasoning_content`（思考）再输出 `content`（答案），`max_tokens` 需足够，否则答案为空。
+3. 模型请求偶发网络抖动，后续需重试与降级。
 
 ---
 
