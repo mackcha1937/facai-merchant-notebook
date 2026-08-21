@@ -4,10 +4,12 @@ from sqlalchemy.orm import Session
 
 from app.application import trash_service
 from app.core.database import get_db
+from app.core.rbac import require_owner
 
 router = APIRouter(prefix="/api/trash", tags=["trash"])
 
 
 @router.get("")
 def list_trash(db: Session = Depends(get_db)):
+    require_owner()
     return trash_service.list_trash(db)

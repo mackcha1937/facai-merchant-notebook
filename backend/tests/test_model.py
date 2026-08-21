@@ -43,11 +43,17 @@ def test_model_status_does_not_expose_key():
 
 
 def test_model_check_without_key():
-    app.dependency_overrides[get_settings] = lambda: _fake_settings()
+    from app.core.tenant import set_current_role
+
+    set_current_role("admin")
     try:
-        resp = client.post("/api/model/check")
+        app.dependency_overrides[get_settings] = lambda: _fake_settings()
+        try:
+            resp = client.post("/api/model/check")
+        finally:
+            app.dependency_overrides.clear()
     finally:
-        app.dependency_overrides.clear()
+        set_current_role(None)
     assert resp.status_code == 200
     body = resp.json()
     assert body["configured"] is False

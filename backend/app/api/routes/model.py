@@ -1,10 +1,12 @@
 """模型配置状态与连通性检查接口。
 
-只返回“是否配置”和连通状态，绝不返回 API Key 内容。
+- GET /api/config/model-status：owner/admin 可读（脱敏，不返回密钥）；
+- POST /api/model/check：仅 admin（会产生真实模型费用）。
 """
 from fastapi import APIRouter, Depends
 
 from app.core.config import Settings, get_settings
+from app.core.rbac import require_admin
 from app.infrastructure.llm.deepseek import DeepSeekAdapter
 
 router = APIRouter(tags=["model"])
@@ -22,7 +24,8 @@ def model_status(settings: Settings = Depends(get_settings)) -> dict:
 
 @router.post("/api/model/check")
 def model_check(settings: Settings = Depends(get_settings)) -> dict:
-    """执行一次最小连通性请求，返回脱敏结果。"""
+    """执行一次最小连通性请求，返回脱敏结果（仅 admin）。"""
+    require_admin()
     adapter = DeepSeekAdapter(settings=settings)
     result = adapter.check_connectivity()
     return {

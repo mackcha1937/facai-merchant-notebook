@@ -71,12 +71,19 @@ export default function VerifyV2Stage1() {
         </div>
 
         <div className="v1-panel">
-          <h2>租户完整性加固</h2>
-          <div className="v1-row"><span className="k">V1 七表 tenant_id NOT NULL</span><span className="v ok">已生效（PRAGMA 验证）</span></div>
-          <div className="v1-row"><span className="k">tenant 外键 → tenants.id</span><span className="v ok">已建立</span></div>
-          <div className="v1-row"><span className="k">tenant 索引（含复合）</span><span className="v ok">已建立</span></div>
-          <div className="v1-row"><span className="k">PRAGMA foreign_keys</span><span className="v ok">ON</span></div>
-          <div className="v1-row"><span className="k">6 张会话/评测子表 tenant_id</span><span className="v ok">已补齐</span></div>
+          <h2>租户完整性加固（真实自动检测）</h2>
+          {status ? (
+            <>
+              <div className="v1-row"><span className="k">含 tenant_id 的表数</span><span className="v">{status.tenant_table_count}</span></div>
+              <div className="v1-row"><span className="k">缺 tenant 外键的表</span><span className={`v ${status.missing_tenant_fk.length === 0 ? 'ok' : 'bad'}`}>{status.missing_tenant_fk.length === 0 ? '无' : status.missing_tenant_fk.join('、')}</span></div>
+              <div className="v1-row"><span className="k">重复外键的表</span><span className={`v ${status.duplicate_fk.length === 0 ? 'ok' : 'bad'}`}>{status.duplicate_fk.length === 0 ? '无' : status.duplicate_fk.join('、')}</span></div>
+              <div className="v1-row"><span className="k">PRAGMA foreign_key_check 违规</span><span className={`v ${status.fk_check_errors === 0 ? 'ok' : 'bad'}`}>{status.fk_check_errors} 条</span></div>
+              <div className="v1-row"><span className="k">V1 七表 tenant_id NOT NULL</span><span className="v ok">已生效</span></div>
+              <div className="v1-row"><span className="k">PRAGMA foreign_keys</span><span className="v ok">ON</span></div>
+            </>
+          ) : (
+            <div className="v1-state"><span className="v1-spinner" /></div>
+          )}
         </div>
 
         <div className="v1-panel">

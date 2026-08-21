@@ -12,11 +12,13 @@ router = APIRouter(prefix="/api/settings/prompt", tags=["settings"])
 
 @router.get("")
 def get_prompt(db: Session = Depends(get_db)):
+    require_admin()
     return prompt_service.get_current_prompt(db)
 
 
 @router.get("/versions")
 def list_versions(db: Session = Depends(get_db)):
+    require_admin()
     return prompt_service.list_versions(db)
 
 

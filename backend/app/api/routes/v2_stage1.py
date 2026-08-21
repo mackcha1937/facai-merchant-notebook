@@ -41,6 +41,27 @@ def stage1_status():
         package_count = cur.execute("SELECT COUNT(*) FROM packages WHERE deleted_at IS NULL").fetchone()[0]
         ledger_count = cur.execute("SELECT COUNT(*) FROM ledger_entries WHERE deleted_at IS NULL").fetchone()[0]
 
+        # tenant 完整性检测（自动扫描）
+        tenant_tables = []
+        missing_fk = []
+        duplicate_fk = []
+        for t in sorted(all_tables):
+            cols = {r[1]: r for r in cur.execute(f"PRAGMA table_info({t})").fetchall()}
+            if "tenant_id" not in cols:
+                continue
+            tenant_tables.append(t)
+            fks = cur.execute(f"PRAGMA foreign_key_list({t})").fetchall()
+            if not any(fk[2] == "tenants" and fk[3] == "tenant_id" for fk in fks):
+                missing_fk.append(t)
+            seen = {}
+            for fk in fks:
+                key = (fk[3], fk[2])
+                seen[key] = seen.get(key, 0) + 1
+            if any(v > 1 for v in seen.values()):
+                duplicate_fk.append(t)
+        cur.execute("PRAGMA foreign_keys=ON")
+        fk_check = cur.execute("PRAGMA foreign_key_check").fetchall()
+
         return {
             "migration_version": migration_version,
             "table_count": len(all_tables),
@@ -51,6 +72,10 @@ def stage1_status():
             "null_tenant_customers": null_tenant_customers,
             "product_draft_count": cur.execute("SELECT COUNT(*) FROM products WHERE lifecycle_status='draft'").fetchone()[0],
             "ledger_product_backfill": cur.execute("SELECT COUNT(*) FROM ledger_entries WHERE product_id IS NOT NULL").fetchone()[0],
+            "tenant_table_count": len(tenant_tables),
+            "missing_tenant_fk": missing_fk,
+            "duplicate_fk": duplicate_fk,
+            "fk_check_errors": len(fk_check),
             "v1_baseline": {
                 "customer_count": customer_count,
                 "package_count": package_count,

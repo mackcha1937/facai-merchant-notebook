@@ -105,35 +105,97 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # 回滚时临时关闭外键，避免 batch 重建表时外键干扰
     bind = op.get_bind()
     bind.exec_driver_sql("PRAGMA foreign_keys=OFF")
 
-    # 先移除 tenant 索引（避免重建表时索引引用 tenant_id 失败）
+    # 移除 tenant 索引（先删，避免重建表时索引引用 tenant_id 失败）
     for table in V1_TABLES:
-        try:
-            op.drop_index(f"ix_{table}_tenant_id", table_name=table)
-        except Exception:  # noqa: BLE001
-            pass
+        op.drop_index(f"ix_{table}_tenant_id", table_name=table)
     for table in SUBTABLE_BACKFILL.keys():
-        try:
-            op.drop_index(f"ix_{table}_tenant_id", table_name=table)
-        except Exception:  # noqa: BLE001
-            pass
-    for name, tbl in [
-        ("ix_packages_tenant_customer", "packages"),
-        ("ix_ledger_tenant_customer", "ledger_entries"),
-        ("ix_customer_aliases_tenant_customer", "customer_aliases"),
-    ]:
-        try:
-            op.drop_index(name, table_name=tbl)
-        except Exception:  # noqa: BLE001
-            pass
+        op.drop_index(f"ix_{table}_tenant_id", table_name=table)
+    op.drop_index("ix_packages_tenant_customer", table_name="packages")
+    op.drop_index("ix_ledger_tenant_customer", table_name="ledger_entries")
+    op.drop_index("ix_customer_aliases_tenant_customer", table_name="customer_aliases")
 
-    # 移除 6 张子表的 tenant_id 列（batch 重建）
+    # 移除 6 张子表 tenant_id 列
     for table in SUBTABLE_BACKFILL.keys():
-        with op.batch_alter_table(table) as batch:
+        with op.batch_alter_table(table, recreate="always") as batch:
             batch.drop_column("tenant_id")
 
-    # V1 七表的 tenant_id 的 NOT NULL/外键不在此撤销；
-    # 继续 downgrade 到 0003 时会通过 drop tenant_id 列一并移除，不删除 V1 权威字段。
+    # V1 七表恢复到 0008 状态：tenant_id 可空、无 tenant 外键（手动重建）
+    _rebuild_v1_table_nullable_tenant(bind, "customers", [
+        "id INTEGER NOT NULL PRIMARY KEY",
+        "tenant_id INTEGER",
+        "display_name VARCHAR(100) NOT NULL",
+        "created_at DATETIME",
+        "updated_at DATETIME",
+        "deleted_at DATETIME",
+    ], ["id", "tenant_id", "display_name", "created_at", "updated_at", "deleted_at"])
+    _rebuild_v1_table_nullable_tenant(bind, "customer_aliases", [
+        "id INTEGER NOT NULL PRIMARY KEY",
+        "tenant_id INTEGER",
+        "customer_id INTEGER NOT NULL",
+        "alias VARCHAR(100) NOT NULL",
+        "deleted_at DATETIME",
+    ], ["id", "tenant_id", "customer_id", "alias", "deleted_at"])
+    _rebuild_v1_table_nullable_tenant(bind, "services", [
+        "id INTEGER NOT NULL PRIMARY KEY",
+        "tenant_id INTEGER",
+        "name VARCHAR(100) NOT NULL",
+        "status VARCHAR(20) NOT NULL",
+        "deleted_at DATETIME",
+    ], ["id", "tenant_id", "name", "status", "deleted_at"])
+    _rebuild_v1_table_nullable_tenant(bind, "packages", [
+        "id INTEGER NOT NULL PRIMARY KEY",
+        "tenant_id INTEGER",
+        "customer_id INTEGER NOT NULL",
+        "service_id INTEGER NOT NULL",
+        "total_count INTEGER NOT NULL",
+        "opening_used_count INTEGER NOT NULL",
+        "price_cents INTEGER",
+        "purchased_on VARCHAR(20)",
+        "status VARCHAR(20) NOT NULL",
+        "deleted_at DATETIME",
+    ], ["id", "tenant_id", "customer_id", "service_id", "total_count", "opening_used_count", "price_cents", "purchased_on", "status", "deleted_at"])
+    _rebuild_v1_table_nullable_tenant(bind, "ledger_entries", [
+        "id INTEGER NOT NULL PRIMARY KEY",
+        "tenant_id INTEGER",
+        "customer_id INTEGER NOT NULL",
+        "entry_type VARCHAR(30) NOT NULL",
+        "package_id INTEGER",
+        "service_id INTEGER",
+        "product_name VARCHAR(100)",
+        "quantity INTEGER NOT NULL",
+        "price_cents INTEGER",
+        "occurred_on VARCHAR(20)",
+        "original_input TEXT",
+        "agent_prompt_version INTEGER",
+        "deleted_at DATETIME",
+    ], ["id", "tenant_id", "customer_id", "entry_type", "package_id", "service_id", "product_name", "quantity", "price_cents", "occurred_on", "original_input", "agent_prompt_version", "deleted_at"])
+    _rebuild_v1_table_nullable_tenant(bind, "prompt_versions", [
+        "id INTEGER NOT NULL PRIMARY KEY",
+        "tenant_id INTEGER",
+        "version INTEGER NOT NULL",
+        "content TEXT NOT NULL",
+        "created_at DATETIME",
+        "is_active BOOLEAN NOT NULL",
+    ], ["id", "tenant_id", "version", "content", "created_at", "is_active"])
+    _rebuild_v1_table_nullable_tenant(bind, "agent_proposals", [
+        "id INTEGER NOT NULL PRIMARY KEY",
+        "tenant_id INTEGER",
+        "original_input TEXT NOT NULL",
+        "parsed_json TEXT NOT NULL",
+        "prompt_version INTEGER",
+        "status VARCHAR(20) NOT NULL",
+        "created_at DATETIME",
+        "confirmed_at DATETIME",
+    ], ["id", "tenant_id", "original_input", "parsed_json", "prompt_version", "status", "created_at", "confirmed_at"])
+
+
+def _rebuild_v1_table_nullable_tenant(bind, table, column_defs, columns):
+    cols = ", ".join(column_defs)
+    col_list = ", ".join(columns)
+    bind.exec_driver_sql(f"CREATE TABLE _tmp_{table} ({cols})")
+    bind.exec_driver_sql(f"INSERT INTO _tmp_{table} ({col_list}) SELECT {col_list} FROM {table}")
+    bind.exec_driver_sql(f"DROP TABLE {table}")
+    bind.exec_driver_sql(f"ALTER TABLE _tmp_{table} RENAME TO {table}")
