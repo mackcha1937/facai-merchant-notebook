@@ -1,0 +1,54 @@
+[
+  {
+    "customer_id": "cus_red_001",
+    "wechat_remark": "小红",
+    "wechat_name": "红红爱生活",
+    "nickname": "红姐",
+    "phone": null,
+    "aliases": ["红姐姐", "红姐"],
+    "facts": [
+      { "type": "skin_condition", "value": "敏感", "source": "owner_input", "confirmed": true },
+      { "type": "concern", "value": "易长痘", "source": "owner_input", "confirmed": true }
+    ],
+    "packages": [
+      { "package_id": "pkg_red_hair_001", "service_id": "svc_hair_removal_001", "name": "脱毛9次卡", "total_sessions": 9, "remaining_sessions": 7, "price": 999, "purchased_on": "2026-05-10" }
+    ],
+    "transactions": [
+      { "transaction_id": "tx_red_mask_001", "type": "product_purchase", "product_id": "prod_mask_soothing_001", "quantity": 1, "occurred_at": "2026-06-20T10:00:00+08:00" }
+    ],
+    "is_synthetic": true
+  },
+  {
+    "customer_id": "cus_yellow_001",
+    "wechat_remark": "小黄",
+    "wechat_name": "黄女士",
+    "nickname": "黄姐",
+    "phone": null,
+    "aliases": ["黄姐姐"],
+    "facts": [
+      { "type": "preference", "value": "偏好简单护理", "source": "owner_input", "confirmed": true }
+    ],
+    "packages": [
+      { "package_id": "pkg_yellow_clean_001", "service_id": "svc_facial_clean_001", "name": "面部清洁10次卡", "total_sessions": 10, "remaining_sessions": 3, "price": 666, "purchased_on": "2026-03-01" }
+    ],
+    "transactions": [],
+    "is_synthetic": true
+  },
+  {
+    "customer_id": "cus_blue_001",
+    "wechat_remark": "小蓝",
+    "wechat_name": "蓝蓝",
+    "nickname": "蓝蓝",
+    "phone": null,
+    "aliases": ["蓝姐"],
+    "facts": [],
+    "packages": [
+      { "package_id": "pkg_blue_neck_001", "service_id": "svc_neck_001", "name": "肩颈按摩3次卡", "total_sessions": 3, "remaining_sessions": 2, "price": 299, "purchased_on": null },
+      { "package_id": "pkg_blue_clean_001", "service_id": "svc_facial_clean_001", "name": "面部清洁5次卡", "total_sessions": 5, "remaining_sessions": 5, "price": null, "purchased_on": "2026-08-19" }
+    ],
+    "transactions": [
+      { "transaction_id": "tx_blue_neck_001", "type": "service_redeem", "service_id": "svc_neck_001", "quantity": 1, "occurred_at": "2026-08-19T14:30:00+08:00" }
+    ],
+    "is_synthetic": true
+  }
+]

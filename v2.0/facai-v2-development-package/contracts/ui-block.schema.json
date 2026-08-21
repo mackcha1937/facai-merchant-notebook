@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://facai.local/schemas/ui-block.schema.json",
+  "title": "发财对话内交互块",
+  "oneOf": [
+    { "$ref": "#/$defs/confirmation" },
+    { "$ref": "#/$defs/customerCandidates" },
+    { "$ref": "#/$defs/customerDetail" },
+    { "$ref": "#/$defs/todayTasks" },
+    { "$ref": "#/$defs/recommendation" },
+    { "$ref": "#/$defs/undo" }
+  ],
+  "$defs": {
+    "base": {
+      "type": "object",
+      "required": ["block_id", "type", "title"],
+      "properties": {
+        "block_id": { "type": "string" },
+        "type": { "type": "string" },
+        "title": { "type": "string" },
+        "subtitle": { "type": ["string", "null"] },
+        "collapsible": { "type": "boolean", "default": false }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action_id", "label", "kind"],
+      "properties": {
+        "action_id": { "type": "string" },
+        "label": { "type": "string" },
+        "kind": { "type": "string", "enum": ["primary", "secondary", "danger", "link"] },
+        "voice_aliases": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+      }
+    },
+    "confirmation": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "properties": {
+            "type": { "const": "confirmation" },
+            "proposal_id": { "type": "string" },
+            "summary_rows": { "type": "array", "items": { "type": "object" } },
+            "actions": { "type": "array", "items": { "$ref": "#/$defs/action" }, "minItems": 2 }
+          },
+          "required": ["proposal_id", "summary_rows", "actions"]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "customerCandidates": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "properties": {
+            "type": { "const": "customer_candidates" },
+            "query": { "type": "string" },
+            "candidates": { "type": "array", "maxItems": 3, "items": { "type": "object", "required": ["customer_id", "display_name", "aliases", "summary"] } },
+            "allow_create": { "type": "boolean" },
+            "actions": { "type": "array", "items": { "$ref": "#/$defs/action" } }
+          },
+          "required": ["query", "candidates", "allow_create", "actions"]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "customerDetail": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "properties": {
+            "type": { "const": "customer_detail" },
+            "customer_id": { "type": "string" },
+            "sections": { "type": "array", "items": { "type": "object" } },
+            "return_focus": { "type": "string" },
+            "actions": { "type": "array", "items": { "$ref": "#/$defs/action" } }
+          },
+          "required": ["customer_id", "sections", "return_focus", "actions"]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "todayTasks": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "properties": {
+            "type": { "const": "today_tasks" },
+            "unread_count": { "type": "integer", "minimum": 0 },
+            "tasks": { "type": "array", "items": { "type": "object" } },
+            "actions": { "type": "array", "items": { "$ref": "#/$defs/action" } }
+          },
+          "required": ["unread_count", "tasks", "actions"]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "recommendation": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "properties": {
+            "type": { "const": "recommendation" },
+            "recommendation": { "$ref": "recommendation.schema.json" },
+            "actions": { "type": "array", "items": { "$ref": "#/$defs/action" } }
+          },
+          "required": ["recommendation", "actions"]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "undo": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "properties": {
+            "type": { "const": "undo" },
+            "operation_id": { "type": "string" },
+            "undo_until": { "type": "string", "format": "date-time" },
+            "actions": { "type": "array", "items": { "$ref": "#/$defs/action" } }
+          },
+          "required": ["operation_id", "undo_until", "actions"]
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}

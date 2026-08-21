@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://facai.local/schemas/agent-output.schema.json",
+  "title": "发财智能体输出协议",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request_id", "intent", "reply", "confidence", "proposal", "ui_blocks"],
+  "properties": {
+    "request_id": { "type": "string", "minLength": 8 },
+    "intent": {
+      "type": "string",
+      "enum": ["record_purchase", "redeem_service", "query_customer", "update_customer", "create_customer", "manage_catalog", "view_tasks", "recommendation_feedback", "unknown"]
+    },
+    "reply": { "type": "string", "minLength": 1, "maxLength": 800 },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "entities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "customer_query": { "type": ["string", "null"] },
+        "customer_id": { "type": ["string", "null"] },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/item" }, "maxItems": 20 },
+        "occurred_at": { "type": ["string", "null"], "format": "date-time" },
+        "price": { "type": ["number", "null"], "minimum": 0 },
+        "customer_facts": { "type": "array", "items": { "$ref": "#/$defs/fact" }, "maxItems": 30 }
+      }
+    },
+    "proposal": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["proposal_id", "operation", "requires_confirmation", "expires_at", "changes"],
+          "properties": {
+            "proposal_id": { "type": "string" },
+            "operation": { "type": "string", "enum": ["create", "update", "delete", "redeem", "purchase", "restore", "catalog_create"] },
+            "requires_confirmation": { "const": true },
+            "expires_at": { "type": "string", "format": "date-time" },
+            "changes": { "type": "array", "items": { "$ref": "#/$defs/change" }, "minItems": 1, "maxItems": 50 }
+          }
+        }
+      ]
+    },
+    "ui_blocks": {
+      "type": "array",
+      "items": { "$ref": "ui-block.schema.json" },
+      "maxItems": 20
+    },
+    "warnings": { "type": "array", "items": { "type": "string" }, "maxItems": 10 },
+    "trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "prompt_version": { "type": "string" },
+        "model": { "type": "string" },
+        "retrieval_id": { "type": ["string", "null"] },
+        "latency_ms": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "$defs": {
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["raw_name", "kind", "quantity"],
+      "properties": {
+        "raw_name": { "type": "string" },
+        "catalog_id": { "type": ["string", "null"] },
+        "kind": { "type": "string", "enum": ["product", "service", "unknown"] },
+        "quantity": { "type": "number", "exclusiveMinimum": 0 },
+        "total_sessions": { "type": ["integer", "null"], "minimum": 1 },
+        "unit_price": { "type": ["number", "null"], "minimum": 0 },
+        "match_method": { "type": ["string", "null"], "enum": ["exact", "alias", "fuzzy", "embedding", "llm", "new", null] }
+      }
+    },
+    "fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "value", "source_text", "confidence"],
+      "properties": {
+        "type": { "type": "string", "enum": ["skin_condition", "concern", "preference", "allergy", "contraindication", "note"] },
+        "value": { "type": "string" },
+        "source_text": { "type": "string" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity", "entity_id", "field", "before", "after"],
+      "properties": {
+        "entity": { "type": "string" },
+        "entity_id": { "type": ["string", "null"] },
+        "field": { "type": "string" },
+        "before": {},
+        "after": {}
+      }
+    }
+  }
+}

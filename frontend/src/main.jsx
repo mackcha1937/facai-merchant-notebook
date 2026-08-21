@@ -12,6 +12,7 @@ import VerifyStage1 from './pages/v1/VerifyStage1.jsx'
 import VerifyStage2 from './pages/v1/VerifyStage2.jsx'
 import VerifyStage3 from './pages/v1/VerifyStage3.jsx'
 import VerifyStage4 from './pages/v1/VerifyStage4.jsx'
+import VerifyV2Stage0 from './pages/v2/VerifyV2Stage0.jsx'
 import CustomerSheet from './pages/v1/CustomerSheet.jsx'
 import Settings from './pages/v1/Settings.jsx'
 import PromptSettings from './pages/v1/PromptSettings.jsx'
@@ -28,6 +29,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <Route path="/verify/stage-2" element={<VerifyStage2 />} />
         <Route path="/verify/stage-3" element={<VerifyStage3 />} />
         <Route path="/verify/stage-4" element={<VerifyStage4 />} />
+        <Route path="/verify/v2-stage-0" element={<VerifyV2Stage0 />} />
         <Route path="/settings/prompt" element={<PromptSettings />} />
       </Routes>
     </BrowserRouter>

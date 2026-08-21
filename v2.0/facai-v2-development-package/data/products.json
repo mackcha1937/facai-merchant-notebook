@@ -1,0 +1,38 @@
+[
+  {
+    "product_id": "prod_cream_antiacne_001",
+    "name": "净痘修护面霜",
+    "aliases": ["祛痘面霜", "痘痘霜", "净痘霜"],
+    "category": "面霜",
+    "price": 199,
+    "suggested_repurchase_days": 60,
+    "suitable_tags": ["易长痘", "希望清爽肤感"],
+    "avoid_tags": ["已知成分不耐受"],
+    "status": "active",
+    "is_synthetic": true
+  },
+  {
+    "product_id": "prod_mask_soothing_001",
+    "name": "舒缓修护面膜",
+    "aliases": ["舒缓面膜", "修护面膜", "面膜"],
+    "category": "面膜",
+    "price": 99,
+    "suggested_repurchase_days": 30,
+    "suitable_tags": ["敏感", "干燥"],
+    "avoid_tags": ["已知成分不耐受"],
+    "status": "active",
+    "is_synthetic": true
+  },
+  {
+    "product_id": "prod_serum_hydrate_001",
+    "name": "水润精华",
+    "aliases": ["补水精华", "精华"],
+    "category": "精华",
+    "price": 259,
+    "suggested_repurchase_days": 45,
+    "suitable_tags": ["干燥", "补水偏好"],
+    "avoid_tags": [],
+    "status": "active",
+    "is_synthetic": true
+  }
+]

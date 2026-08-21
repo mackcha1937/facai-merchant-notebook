@@ -1,0 +1,62 @@
+[
+  {
+    "service_id": "svc_facial_clean_001",
+    "name": "面部清洁",
+    "aliases": ["做脸", "清洁脸", "脸部清洁"],
+    "service_mode": "package_or_single",
+    "default_sessions": null,
+    "suggested_interval_days": 28,
+    "suitable_tags": ["清洁需求", "易长痘"],
+    "avoid_tags": ["皮肤正在明显不适"],
+    "status": "active",
+    "is_synthetic": true
+  },
+  {
+    "service_id": "svc_neck_001",
+    "name": "肩颈按摩",
+    "aliases": ["肩颈", "肩颈按扭", "肩颈按钮"],
+    "service_mode": "package_or_single",
+    "default_sessions": null,
+    "suggested_interval_days": 14,
+    "suitable_tags": ["肩颈放松需求"],
+    "avoid_tags": ["存在不适且未咨询专业人士"],
+    "status": "active",
+    "is_synthetic": true
+  },
+  {
+    "service_id": "svc_body_001",
+    "name": "身体护理",
+    "aliases": ["做身体", "身体"],
+    "service_mode": "package_or_single",
+    "default_sessions": null,
+    "suggested_interval_days": 21,
+    "suitable_tags": ["身体护理需求"],
+    "avoid_tags": ["存在不适且未咨询专业人士"],
+    "status": "active",
+    "is_synthetic": true
+  },
+  {
+    "service_id": "svc_acne_clean_001",
+    "name": "清痘",
+    "aliases": ["清理痘痘", "清痘护理"],
+    "service_mode": "package_or_single",
+    "default_sessions": null,
+    "suggested_interval_days": 21,
+    "suitable_tags": ["易长痘"],
+    "avoid_tags": ["皮肤正在明显不适"],
+    "status": "active",
+    "is_synthetic": true
+  },
+  {
+    "service_id": "svc_hair_removal_001",
+    "name": "脱毛",
+    "aliases": ["脱毛护理"],
+    "service_mode": "package_or_single",
+    "default_sessions": null,
+    "suggested_interval_days": 30,
+    "suitable_tags": ["脱毛需求"],
+    "avoid_tags": ["护理区域正在明显不适"],
+    "status": "active",
+    "is_synthetic": true
+  }
+]
