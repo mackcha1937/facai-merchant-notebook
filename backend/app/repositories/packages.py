@@ -1,9 +1,10 @@
-"""套餐卡数据访问。"""
+"""套餐卡数据访问（强制 tenant 过滤）。"""
 from datetime import datetime, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.tenant import get_current_tenant_id
 from app.infrastructure.models import LedgerEntry, Package
 
 
@@ -15,7 +16,11 @@ def list_packages_for_customer(db: Session, customer_id: int) -> list[Package]:
     return list(
         db.scalars(
             select(Package)
-            .where(Package.customer_id == customer_id, Package.deleted_at.is_(None))
+            .where(
+                Package.customer_id == customer_id,
+                Package.deleted_at.is_(None),
+                Package.tenant_id == get_current_tenant_id(),
+            )
             .options(selectinload(Package.service))
             .order_by(Package.id)
         ).all()
@@ -33,6 +38,7 @@ def list_packages_for_customer_service(
                 Package.customer_id == customer_id,
                 Package.service_id == service_id,
                 Package.deleted_at.is_(None),
+                Package.tenant_id == get_current_tenant_id(),
             )
             .options(selectinload(Package.service))
             .order_by(Package.id)
@@ -43,7 +49,11 @@ def list_packages_for_customer_service(
 def get_package(db: Session, package_id: int) -> Package | None:
     return db.scalar(
         select(Package)
-        .where(Package.id == package_id, Package.deleted_at.is_(None))
+        .where(
+            Package.id == package_id,
+            Package.deleted_at.is_(None),
+            Package.tenant_id == get_current_tenant_id(),
+        )
         .options(selectinload(Package.service))
     )
 
@@ -51,7 +61,9 @@ def get_package(db: Session, package_id: int) -> Package | None:
 def get_package_any(db: Session, package_id: int) -> Package | None:
     """含已删除，用于恢复。"""
     return db.scalar(
-        select(Package).where(Package.id == package_id).options(selectinload(Package.service))
+        select(Package)
+        .where(Package.id == package_id, Package.tenant_id == get_current_tenant_id())
+        .options(selectinload(Package.service))
     )
 
 
@@ -65,6 +77,7 @@ def create_package(
     purchased_on: str | None,
 ) -> Package:
     package = Package(
+        tenant_id=get_current_tenant_id(),
         customer_id=customer_id,
         service_id=service_id,
         total_count=total_count,

@@ -1,9 +1,10 @@
-"""账本记录数据访问。"""
+"""账本记录数据访问（强制 tenant 过滤）。"""
 from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.tenant import get_current_tenant_id
 from app.infrastructure.models import LedgerEntry
 
 
@@ -15,7 +16,11 @@ def list_ledger_for_customer(db: Session, customer_id: int) -> list[LedgerEntry]
     return list(
         db.scalars(
             select(LedgerEntry)
-            .where(LedgerEntry.customer_id == customer_id, LedgerEntry.deleted_at.is_(None))
+            .where(
+                LedgerEntry.customer_id == customer_id,
+                LedgerEntry.deleted_at.is_(None),
+                LedgerEntry.tenant_id == get_current_tenant_id(),
+            )
             .options(selectinload(LedgerEntry.service))
             .order_by(LedgerEntry.id.desc())
         ).all()
@@ -33,6 +38,7 @@ def list_ledger_for_customer_service(
                 LedgerEntry.customer_id == customer_id,
                 LedgerEntry.service_id == service_id,
                 LedgerEntry.deleted_at.is_(None),
+                LedgerEntry.tenant_id == get_current_tenant_id(),
             )
             .options(selectinload(LedgerEntry.service))
             .order_by(LedgerEntry.occurred_on.desc(), LedgerEntry.id.desc())
@@ -43,14 +49,20 @@ def list_ledger_for_customer_service(
 def get_ledger_entry(db: Session, entry_id: int) -> LedgerEntry | None:
     return db.scalar(
         select(LedgerEntry).where(
-            LedgerEntry.id == entry_id, LedgerEntry.deleted_at.is_(None)
+            LedgerEntry.id == entry_id,
+            LedgerEntry.deleted_at.is_(None),
+            LedgerEntry.tenant_id == get_current_tenant_id(),
         )
     )
 
 
 def get_ledger_entry_any(db: Session, entry_id: int) -> LedgerEntry | None:
     """含已删除，用于恢复。"""
-    return db.scalar(select(LedgerEntry).where(LedgerEntry.id == entry_id))
+    return db.scalar(
+        select(LedgerEntry).where(
+            LedgerEntry.id == entry_id, LedgerEntry.tenant_id == get_current_tenant_id()
+        )
+    )
 
 
 def create_ledger_entry(
@@ -67,6 +79,7 @@ def create_ledger_entry(
     agent_prompt_version: int | None = None,
 ) -> LedgerEntry:
     entry = LedgerEntry(
+        tenant_id=get_current_tenant_id(),
         customer_id=customer_id,
         entry_type=entry_type,
         package_id=package_id,

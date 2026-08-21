@@ -1,9 +1,10 @@
-"""客户与别名数据访问。"""
+"""客户与别名数据访问（强制 tenant 过滤）。"""
 from datetime import datetime, timezone
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.tenant import get_current_tenant_id
 from app.infrastructure.models import Customer, CustomerAlias
 
 
@@ -12,9 +13,10 @@ def _utcnow() -> datetime:
 
 
 def list_customers(db: Session, search: str | None = None) -> list[Customer]:
+    tenant_id = get_current_tenant_id()
     stmt = (
         select(Customer)
-        .where(Customer.deleted_at.is_(None))
+        .where(Customer.deleted_at.is_(None), Customer.tenant_id == tenant_id)
         .options(selectinload(Customer.aliases))
     )
     if search and search.strip():
@@ -33,21 +35,27 @@ def list_customers(db: Session, search: str | None = None) -> list[Customer]:
 def get_customer(db: Session, customer_id: int) -> Customer | None:
     return db.scalar(
         select(Customer)
-        .where(Customer.id == customer_id, Customer.deleted_at.is_(None))
+        .where(
+            Customer.id == customer_id,
+            Customer.deleted_at.is_(None),
+            Customer.tenant_id == get_current_tenant_id(),
+        )
         .options(selectinload(Customer.aliases))
     )
 
 
 def get_customer_any(db: Session, customer_id: int) -> Customer | None:
     return db.scalar(
-        select(Customer).where(Customer.id == customer_id)
+        select(Customer).where(
+            Customer.id == customer_id, Customer.tenant_id == get_current_tenant_id()
+        )
     )
 
 
 def create_customer(db: Session, display_name: str, aliases: list[str]) -> Customer:
-    customer = Customer(display_name=display_name)
+    customer = Customer(display_name=display_name, tenant_id=get_current_tenant_id())
     for alias in aliases:
-        customer.aliases.append(CustomerAlias(alias=alias))
+        customer.aliases.append(CustomerAlias(alias=alias, tenant_id=get_current_tenant_id()))
     db.add(customer)
     db.flush()
     return customer
