@@ -3,6 +3,16 @@
 版本：v2.0-rc1 阶段0
 日期：2026-08-21
 
+## 阶段0 交付文档索引（v2.0/stage-0-audit/）
+
+1. [01-current-system-audit.md](./stage-0-audit/01-current-system-audit.md)：现有系统审计
+2. [02-v1-v2-gap-matrix.md](./stage-0-audit/02-v1-v2-gap-matrix.md)：V1/V2 差异矩阵
+3. [03-database-and-migration-risk.md](./stage-0-audit/03-database-and-migration-risk.md)：数据库与迁移风险
+4. [04-deepseek-capability-test.md](./stage-0-audit/04-deepseek-capability-test.md)：DeepSeek 能力验证
+5. [05-embedding-and-speech-options.md](./stage-0-audit/05-embedding-and-speech-options.md)：Embedding 与语音候选
+6. [06-stage-1-implementation-plan.md](./stage-0-audit/06-stage-1-implementation-plan.md)：阶段1 实施计划
+7. [07-backup-start-test-commands.md](./stage-0-audit/07-backup-start-test-commands.md)：运行/测试/备份/回滚命令
+
 ---
 
 ## 1. 现有 V1 代码与能力清单
@@ -31,7 +41,7 @@
 | 系统提示词管理页 + 阶段验证页 | ✅ |
 | 前后端合并单端口托管 + 备份脚本 | ✅ |
 
-### 1.3 V1 数据库表（8 张）
+### 1.3 V1 数据库表（7 张）
 
 `customers`、`customer_aliases`、`services`、`packages`（opening_used_count）、`ledger_entries`（product_name 为自由文本）、`prompt_versions`、`agent_proposals`。
 
