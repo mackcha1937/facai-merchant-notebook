@@ -13,6 +13,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -165,6 +166,23 @@ class AgentProposal(Base):
     status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    owner_id: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    thread_id: Mapped[int | None] = mapped_column(ForeignKey("conversation_threads.id"), nullable=True)
+    request_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    idempotency_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    confirmation_idempotency_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    resolved_absolute_dates: Mapped[str | None] = mapped_column(Text, nullable=True)
+    data_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    authority_snapshot_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    result_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confirmed_by_device: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "request_id", name="uq_agent_proposals_tenant_request"),
+        UniqueConstraint("tenant_id", "idempotency_key", name="uq_agent_proposals_tenant_idempotency"),
+    )
 
 
 # ---------------- V2 客户事实与产品 ----------------
@@ -298,17 +316,26 @@ class ConversationThread(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
     last_active_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "owner_id", name="uq_conversation_thread_tenant_owner"),
+    )
+
 
 class ConversationSession(Base):
     __tablename__ = "conversation_sessions"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     tenant_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    thread_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    thread_id: Mapped[int] = mapped_column(ForeignKey("conversation_threads.id"), nullable=False)
     session_date: Mapped[str | None] = mapped_column(String(20), nullable=True)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    timezone: Mapped[str] = mapped_column(String(50), default="Asia/Shanghai", nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "thread_id", "session_date", name="uq_conversation_session_thread_date"),
+    )
 
 
 class Message(Base):
@@ -316,11 +343,17 @@ class Message(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     tenant_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    session_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    session_id: Mapped[int] = mapped_column(ForeignKey("conversation_sessions.id"), nullable=False)
     role: Mapped[str] = mapped_column(String(20), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     message_type: Mapped[str] = mapped_column(String(30), default="text", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    request_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "request_id", name="uq_messages_tenant_request"),
+    )
 
 
 class MessageBlock(Base):
@@ -328,12 +361,13 @@ class MessageBlock(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     tenant_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    message_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    message_id: Mapped[int] = mapped_column(ForeignKey("messages.id"), nullable=False)
     block_type: Mapped[str] = mapped_column(String(40), nullable=False)
     payload_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     state: Mapped[str] = mapped_column(String(30), default="pending", nullable=False)
     data_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    proposal_id: Mapped[int | None] = mapped_column(ForeignKey("agent_proposals.id"), nullable=True)
 
 
 class EntityMention(Base):
@@ -341,7 +375,7 @@ class EntityMention(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     tenant_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    message_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    message_id: Mapped[int] = mapped_column(ForeignKey("messages.id"), nullable=False)
     entity_type: Mapped[str] = mapped_column(String(30), nullable=False)
     entity_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     surface_text: Mapped[str | None] = mapped_column(String(200), nullable=True)
@@ -352,12 +386,19 @@ class PendingAction(Base):
     __tablename__ = "pending_actions"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    thread_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    thread_id: Mapped[int] = mapped_column(ForeignKey("conversation_threads.id"), nullable=False)
     tenant_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    proposal_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    proposal_id: Mapped[int | None] = mapped_column(ForeignKey("agent_proposals.id"), nullable=True)
     status: Mapped[str] = mapped_column(String(30), default="pending", nullable=False)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "proposal_id", name="uq_pending_actions_tenant_proposal"),
+    )
 
 
 class ContextSummary(Base):
@@ -365,11 +406,16 @@ class ContextSummary(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     tenant_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    session_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    session_id: Mapped[int] = mapped_column(ForeignKey("conversation_sessions.id"), nullable=False)
     topics: Mapped[str | None] = mapped_column(Text, nullable=True)
     entity_ids: Mapped[str | None] = mapped_column(Text, nullable=True)
     pending_ids: Mapped[str | None] = mapped_column(Text, nullable=True)
     generated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "session_id", name="uq_context_summaries_tenant_session"),
+    )
 
 
 class VoiceTurn(Base):

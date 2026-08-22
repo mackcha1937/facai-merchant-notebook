@@ -2,7 +2,8 @@
 // ContextStack 统一返回闭环：详情第二层→详情第一层→列表/今日/管理→对话→关抽屉→离开应用。
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ContextStack, createViewContext, VIEW_TYPES } from '../../lib/contextStack.js'
-import { computeTodayTaskCounts, markTaskRead, handleTask } from '../../lib/todayTasks.js'
+import { computeTodayTaskCounts, markTaskRead } from '../../lib/todayTasks.js'
+import { api } from '../../api.js'
 import TopBar from '../../components/v2/TopBar.jsx'
 import Drawer from '../../components/v2/Drawer.jsx'
 import LeftNav from '../../components/v2/LeftNav.jsx'
@@ -14,31 +15,22 @@ import ServiceDetailCard from '../../components/v2/ServiceDetailCard.jsx'
 import ManageView from '../../components/v2/ManageView.jsx'
 import ManageDetailView from '../../components/v2/ManageDetailView.jsx'
 import {
-  mockCustomers,
-  mockCustomerRecord,
-  mockTodayTasks,
   todayTaskGroups,
   mockManageGroups,
 } from '../../fixtures/mock/index.js'
 
 const makeCtx = (viewType, extra = {}) => ({ ...createViewContext({ viewType }), ...extra })
 
-function getRecord(customerId) {
-  const customer = mockCustomers.find((c) => c.id === customerId)
-  if (customerId === 'c1') return mockCustomerRecord
-  return {
-    ...mockCustomerRecord,
-    id: customerId,
-    display_name: customer?.display_name || '客户',
-    aliases: customer?.aliases || [],
-  }
-}
-
 export default function AppShell({ initialView = 'chat' }) {
   const stackRef = useRef(null)
   if (stackRef.current === null) {
-    const stack = new ContextStack(makeCtx(VIEW_TYPES.CHAT))
-    if (initialView !== 'chat') {
+    let restored = null
+    try { restored = JSON.parse(window.sessionStorage.getItem('facai-v2-context-stack') || 'null') } catch { restored = null }
+    const canRestore = initialView === 'chat' && Array.isArray(restored) && restored.length > 0
+    const stack = new ContextStack(canRestore ? restored[0] : makeCtx(VIEW_TYPES.CHAT))
+    if (canRestore) {
+      restored.slice(1).forEach((context) => stack.push(context))
+    } else if (initialView !== 'chat') {
       stack.push(makeCtx(initialView, initialView === VIEW_TYPES.CUSTOMER_INDEX
         ? { query: '', filter: 'all', sort: 'recent_consumption', scrollPosition: 0 }
         : {}))
@@ -49,70 +41,136 @@ export default function AppShell({ initialView = 'chat' }) {
   const bump = useCallback(() => setVersion((v) => v + 1), [])
 
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [draftInput, setDraftInput] = useState('')
-  const [sending, setSending] = useState(false)
-  const [todayTasks, setTodayTasks] = useState(mockTodayTasks)
+  const [draftInput, setDraftInput] = useState(() => window.localStorage.getItem('facai-v2-draft') || '')
+  const [todayTasks, setTodayTasks] = useState([])
+  const [customers, setCustomers] = useState([])
+  const [records, setRecords] = useState({})
+  const [serviceDetails, setServiceDetails] = useState({})
+  const [dataError, setDataError] = useState('')
   const savedDraftRef = useRef('')
 
   const current = stackRef.current.current
   const counts = computeTodayTaskCounts(todayTasks)
+  const persistStack = useCallback(() => {
+    window.sessionStorage.setItem('facai-v2-context-stack', JSON.stringify(stackRef.current.snapshot()))
+  }, [])
+
+  useEffect(() => {
+    window.localStorage.setItem('facai-v2-draft', draftInput)
+  }, [draftInput])
+
+  const refreshCustomers = useCallback(async () => {
+    try {
+      const rows = await api.getCustomers()
+      setCustomers(rows.map((row) => ({ ...row, follow_up: false, unread_count: 0 })))
+      setDataError('')
+    } catch (error) {
+      setDataError(error.message)
+    }
+  }, [])
+
+  useEffect(() => { refreshCustomers() }, [refreshCustomers])
+
+  const loadRecord = useCallback(async (customerId) => {
+    try {
+      const record = await api.getAuthoritativeCustomerRecord(customerId)
+      setRecords((current) => ({ ...current, [customerId]: record }))
+      setDataError('')
+      return record
+    } catch (error) {
+      setDataError(error.message)
+      return null
+    }
+  }, [])
+
+  const mapPending = useCallback((items) => {
+    setTodayTasks(items.map((item) => ({
+      id: item.id,
+      group: item.status === 'pending' ? 'pending' : 'conflict',
+      customer_name: item.proposal.customer?.display_name || '待确认事项',
+      summary: item.proposal.changes_summary || item.status,
+      date: item.proposal.absolute_date || '—',
+      unread: !item.read_at,
+      read_at: item.read_at,
+      handled_at: null,
+      status: item.status,
+    })))
+  }, [])
 
   // ---- 导航（前向） ----
   const pushView = useCallback((viewType, extra = {}) => {
     if (stackRef.current.current?.viewType === VIEW_TYPES.CHAT) {
       savedDraftRef.current = draftInput
     }
-    stackRef.current.push(makeCtx(viewType, extra))
+    const focusCustomerId = document.activeElement?.dataset?.customerId || null
+    stackRef.current.push(makeCtx(viewType, { ...extra, focusCustomerId }))
+    window.history.pushState({ v2app: true, ctxDepth: stackRef.current.length - 1 }, '')
+    persistStack()
     bump()
-  }, [bump, draftInput])
+  }, [bump, draftInput, persistStack])
 
   const goChat = useCallback(() => {
     // 回到根层对话
     while (stackRef.current.length > 1) stackRef.current.pop()
     setDrawerOpen(false)
     setDraftInput(savedDraftRef.current)
+    window.history.replaceState({ v2app: true, ctxDepth: 0 }, '')
+    persistStack()
     bump()
-  }, [bump])
+  }, [bump, persistStack])
 
   const openToday = useCallback(() => pushView(VIEW_TYPES.TODAY, { scrollPosition: 0 }), [pushView])
   const openCustomerIndex = useCallback(() => pushView(VIEW_TYPES.CUSTOMER_INDEX, { query: '', filter: 'all', sort: 'recent_consumption', scrollPosition: 0 }), [pushView])
   const openManagement = useCallback(() => pushView(VIEW_TYPES.MANAGEMENT), [pushView])
-  const openCustomerRecord = useCallback((customerId) => pushView(VIEW_TYPES.CUSTOMER_RECORD, { customerId }), [pushView])
-  const openServiceDetail = useCallback((customerId, serviceId) => pushView(VIEW_TYPES.CUSTOMER_SERVICE_DETAIL, { customerId, serviceId }), [pushView])
+  const openCustomerRecord = useCallback((customerId) => {
+    pushView(VIEW_TYPES.CUSTOMER_RECORD, { customerId })
+    loadRecord(customerId)
+  }, [loadRecord, pushView])
+  const openServiceDetail = useCallback((customerId, serviceId) => {
+    pushView(VIEW_TYPES.CUSTOMER_SERVICE_DETAIL, { customerId, serviceId })
+    api.getCustomerServiceDetail(customerId, serviceId)
+      .then((detail) => setServiceDetails((current) => ({ ...current, [`${customerId}:${serviceId}`]: detail })))
+      .catch((error) => setDataError(error.message))
+  }, [pushView])
   const openManageGroup = useCallback((groupId) => pushView(VIEW_TYPES.MANAGEMENT_DETAIL, { groupId }), [pushView])
 
   // ---- 返回（统一顺序，按钮/浏览器返回一致） ----
   const back = useCallback(() => {
     if (stackRef.current.canGoBack()) {
-      stackRef.current.pop()
-      if (stackRef.current.current?.viewType === VIEW_TYPES.CHAT) {
-        setDraftInput(savedDraftRef.current)
-      }
-      bump()
-      return 'pop'
+      window.history.back()
+      return 'pop_requested'
     }
     if (drawerOpen) {
       setDrawerOpen(false)
       return 'close_drawer'
     }
     return 'leave'
-  }, [bump, drawerOpen])
+  }, [drawerOpen])
 
   // 浏览器返回键 / 系统返回键
   useEffect(() => {
     if (!window.history.state?.v2app) {
-      window.history.replaceState({ v2app: true }, '')
+      window.history.replaceState({ v2app: true, ctxDepth: 0 }, '')
+      for (let depth = 1; depth < stackRef.current.length; depth += 1) {
+        window.history.pushState({ v2app: true, ctxDepth: depth }, '')
+      }
     }
-    const onPopState = () => {
-      const action = back()
-      if (action !== 'leave') {
-        // 内部返回，重新压入一个历史条目，保持应用在栈内
-        window.history.pushState({ v2app: true }, '')
+    const onPopState = (event) => {
+      const targetDepth = event.state?.ctxDepth
+      if (targetDepth == null) return
+      let poppedContext = null
+      while (stackRef.current.length - 1 > targetDepth) poppedContext = stackRef.current.pop()
+      if (stackRef.current.current?.viewType === VIEW_TYPES.CHAT) setDraftInput(savedDraftRef.current)
+      const focusCustomerId = poppedContext?.customerId || stackRef.current.current?.focusCustomerId
+      persistStack()
+      bump()
+      if (focusCustomerId) {
+        window.requestAnimationFrame(() => document.querySelector(`[data-customer-id="${focusCustomerId}"]`)?.focus())
       }
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
-  }, [back])
+  }, [bump, persistStack])
 
   // ---- 导航目标 ----
   const navigateTo = useCallback((key) => {
@@ -122,16 +180,18 @@ export default function AppShell({ initialView = 'chat' }) {
     else if (key === 'management') openManagement()
   }, [goChat, openCustomerIndex, openManagement])
 
-  const handleSend = useCallback((text) => {
-    setSending(true)
-    // Mock 生成：稍后停止（可随时点停止）
-    window.setTimeout(() => setSending(false), 1500)
+  const handleTaskRead = useCallback((id) => {
+    api.markPendingRead(id)
+      .then(() => setTodayTasks((prev) => markTaskRead(prev, id)))
+      .catch((error) => setDataError(error.message))
   }, [])
+  const handleTaskHandle = useCallback(() => goChat(), [goChat])
 
-  const handleStop = useCallback(() => setSending(false), [])
-
-  const handleTaskRead = useCallback((id) => setTodayTasks((prev) => markTaskRead(prev, id)), [])
-  const handleTaskHandle = useCallback((id) => setTodayTasks((prev) => handleTask(prev, id)), [])
+  const handleAuthoritativeWrite = useCallback(() => {
+    refreshCustomers()
+    const active = stackRef.current.current
+    if (active?.customerId) loadRecord(active.customerId)
+  }, [loadRecord, refreshCustomers])
 
   const handleCustomerIndexState = useCallback((patch) => {
     const cur = stackRef.current.current
@@ -143,9 +203,15 @@ export default function AppShell({ initialView = 'chat' }) {
         sort: patch.sort ?? cur.sort,
         scrollPosition: patch.scrollPosition ?? cur.scrollPosition,
       })
+      persistStack()
       bump()
     }
-  }, [bump])
+  }, [bump, persistStack])
+
+  useEffect(() => {
+    const active = stackRef.current.current
+    if (active?.customerId && !records[active.customerId]) loadRecord(active.customerId)
+  }, [current?.customerId, loadRecord, records])
 
   // ---- 渲染当前工作区视图 ----
   const renderView = () => {
@@ -165,7 +231,7 @@ export default function AppShell({ initialView = 'chat' }) {
       case VIEW_TYPES.CUSTOMER_INDEX:
         return (
           <CustomerIndexCard
-            customers={mockCustomers}
+            customers={customers}
             onOpenCustomer={(c) => openCustomerRecord(c.id)}
             onBack={back}
             saved={{ query: current.query, filter: current.filter, sort: current.sort, scrollPosition: current.scrollPosition }}
@@ -173,19 +239,21 @@ export default function AppShell({ initialView = 'chat' }) {
           />
         )
       case VIEW_TYPES.CUSTOMER_RECORD: {
-        const record = getRecord(current.customerId)
+        const record = records[current.customerId]
         return (
-          <CustomerRecordCard
+          record ? <CustomerRecordCard
             record={record}
             onBackToList={back}
             onOpenService={(sid) => openServiceDetail(current.customerId, sid)}
-          />
+          /> : <div className="v2-state">正在读取最新权威客户档案…</div>
         )
       }
       case VIEW_TYPES.CUSTOMER_SERVICE_DETAIL: {
-        const record = getRecord(current.customerId)
-        const service = record.services.find((s) => s.id === current.serviceId)
-        return <ServiceDetailCard service={service} customerName={record.display_name} onBack={back} />
+        const record = records[current.customerId]
+        const service = serviceDetails[`${current.customerId}:${current.serviceId}`]
+        return service
+          ? <ServiceDetailCard service={service} customerName={record?.display_name || '客户'} onBack={back} />
+          : <div className="v2-state">正在读取最新权威服务数据…</div>
       }
       case VIEW_TYPES.MANAGEMENT:
         return <ManageView onBack={back} onOpenGroup={(g) => openManageGroup(g.id)} />
@@ -216,12 +284,12 @@ export default function AppShell({ initialView = 'chat' }) {
         <LeftNav active={activeKey} onNavigate={navigateTo} />
 
         <main className="v2-center">
+          {dataError && <div className="v2-inline-error">{dataError}</div>}
           <ChatView
             draftInput={draftInput}
             onDraftChange={setDraftInput}
-            sending={sending}
-            onSend={handleSend}
-            onStop={handleStop}
+            onPendingChange={mapPending}
+            onAuthoritativeWrite={handleAuthoritativeWrite}
           />
         </main>
 

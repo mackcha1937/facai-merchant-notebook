@@ -16,6 +16,7 @@ import VerifyStage4 from './pages/v1/VerifyStage4.jsx'
 import VerifyV2Stage0 from './pages/v2/VerifyV2Stage0.jsx'
 import VerifyV2Stage1 from './pages/v2/VerifyV2Stage1.jsx'
 import VerifyV2Stage2 from './pages/v2/VerifyV2Stage2.jsx'
+import VerifyV2Stage3 from './pages/v2/VerifyV2Stage3.jsx'
 import AppShell from './pages/v2/AppShell.jsx'
 import CustomerSheet from './pages/v1/CustomerSheet.jsx'
 import Settings from './pages/v1/Settings.jsx'
@@ -36,6 +37,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <Route path="/verify/v2-stage-0" element={<VerifyV2Stage0 />} />
         <Route path="/verify/v2-stage-1" element={<VerifyV2Stage1 />} />
         <Route path="/verify/v2-stage-2" element={<VerifyV2Stage2 />} />
+        <Route path="/verify/v2-stage-3" element={<VerifyV2Stage3 />} />
         <Route path="/app/chat" element={<AppShell initialView="chat" />} />
         <Route path="/app/customers" element={<AppShell initialView="customer_index" />} />
         <Route path="/app/manage" element={<AppShell initialView="management" />} />

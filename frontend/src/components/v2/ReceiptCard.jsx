@@ -9,11 +9,13 @@ const STATUS_META = {
   failure: { label: '失败', className: 'bad' },
   cancelled: { label: '已取消', className: 'pending' },
   conflict: { label: '冲突', className: 'warn' },
+  stale: { label: '需重确认', className: 'warn' },
+  expired: { label: '已过期', className: 'warn' },
   deleted: { label: '已删除', className: 'bad' },
   restored: { label: '已恢复', className: 'ok' },
 }
 
-export default function ReceiptCard({ status = 'success', title = '', detail = '', result = null, onRetry }) {
+export default function ReceiptCard({ status = 'success', title = '', detail = '', result = null, onRetry, actionLabel = '重试' }) {
   const [expanded, setExpanded] = useState(false)
   const meta = STATUS_META[status] || STATUS_META.success
   const compressible = status === 'success'
@@ -40,8 +42,8 @@ export default function ReceiptCard({ status = 'success', title = '', detail = '
         </div>
       )}
 
-      {status === 'failure' && onRetry && (
-        <button className="v2-btn secondary" onClick={onRetry}>重试</button>
+      {onRetry && (
+        <button className="v2-btn secondary" onClick={onRetry}>{actionLabel}</button>
       )}
     </div>
   )

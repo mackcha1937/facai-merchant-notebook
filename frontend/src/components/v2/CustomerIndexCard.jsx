@@ -51,7 +51,7 @@ export default function CustomerIndexCard({ customers = [], onOpenCustomer, onBa
       <div className="v2-block-head">
         <div>
           <div className="v2-block-kicker">全部客户</div>
-          <div className="v2-muted">{sorted.length} 位（Mock 化名）</div>
+          <div className="v2-muted">{sorted.length} 位 · 权威客户数据</div>
         </div>
         <button className="v2-link" onClick={onBack}>返回对话</button>
       </div>
@@ -79,11 +79,11 @@ export default function CustomerIndexCard({ customers = [], onOpenCustomer, onBa
 
       <div className="v2-index-list" ref={listRef} onScroll={() => report({ scrollPosition: listRef.current?.scrollTop || 0 })}>
         {sorted.map((c) => (
-          <button key={c.id} className="v2-candidate" onClick={() => { report({ scrollPosition: listRef.current?.scrollTop || 0 }); onOpenCustomer(c) }}>
+          <button key={c.id} data-customer-id={c.id} className="v2-candidate" onClick={() => { report({ scrollPosition: listRef.current?.scrollTop || 0 }); onOpenCustomer(c) }}>
             <span className="v2-avatar">{c.display_name.slice(0, 1)}</span>
             <span className="v2-candidate-main">
-              <strong>{c.display_name}{c.aliases.length > 0 && ` · ${c.aliases.join('、')}`}</strong>
-              <span>最近 {c.last_consumed_at} · {c.service_type_count} 类服务</span>
+              <strong>{c.display_name}{(c.aliases || []).length > 0 && ` · ${c.aliases.join('、')}`}</strong>
+              <span>最近 {c.last_consumed_at || '暂无'} · {c.service_type_count} 类服务</span>
             </span>
             <span className="v2-candidate-side">
               {c.unread_count > 0 && <em className="v2-new">新</em>}

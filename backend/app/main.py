@@ -21,11 +21,12 @@ from app.api.routes import (
     v2_stage0,
     v2_stage1,
     v2_stage2,
+    v2_stage3,
 )
 from app.core.config import get_settings
 from app.core.database import init_db
 from app.core.logging import SanitizingFilter
-from app.domain.errors import DomainError, NotFoundError, PermissionDeniedError
+from app.domain.errors import ConflictError, DomainError, NotFoundError, PermissionDeniedError
 
 settings = get_settings()
 
@@ -82,6 +83,14 @@ async def not_found_error_handler(_request: Request, exc: NotFoundError):
     return JSONResponse(status_code=404, content={"detail": str(exc)})
 
 
+@app.exception_handler(ConflictError)
+async def conflict_error_handler(_request: Request, exc: ConflictError):
+    return JSONResponse(
+        status_code=409,
+        content={"detail": str(exc), "recoverable": True, **exc.payload},
+    )
+
+
 app.include_router(health.router)
 app.include_router(model.router)
 app.include_router(customers.router)
@@ -94,6 +103,7 @@ app.include_router(settings_routes.router)
 app.include_router(v2_stage0.router)
 app.include_router(v2_stage1.router)
 app.include_router(v2_stage2.router)
+app.include_router(v2_stage3.router)
 
 # ---- 前后端合并：后端托管前端构建产物（单端口运行） ----
 FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"

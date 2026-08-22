@@ -1,120 +1,196 @@
-// 对话主界面：日期分隔、店主消息、AI文本、各类固定 UI Block、加载/空/失败/重试/取消示例。
-// 使用 Mock 数据，不接真实 AI；AI 不返回任意 HTML，所有卡片由固定组件渲染。
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { api } from '../../api.js'
 import ChatComposer from '../../components/v2/ChatComposer.jsx'
 import ConfirmCard from '../../components/v2/ConfirmCard.jsx'
-import CustomerRecordCard from '../../components/v2/CustomerRecordCard.jsx'
-import ProductMatchCard from '../../components/v2/ProductMatchCard.jsx'
 import ReceiptCard from '../../components/v2/ReceiptCard.jsx'
-import TodayTaskCard from '../../components/v2/TodayTaskCard.jsx'
-import CustomerIndexCard from '../../components/v2/CustomerIndexCard.jsx'
-import { mockChatMessages, mockCustomerRecord, mockCustomers, mockProductMatches, mockTodayTasks, todayTaskGroups } from '../../fixtures/mock/index.js'
 
-const MOCK_PROPOSAL = {
-  id: 'demo-proposal',
-  title: '确认阿珍今天的面部清洁与商品购买',
-  changes_summary: '面部清洁 1 次 + 购买舒缓保湿霜 1 件',
-  absolute_date: '2026-08-22',
-  precheck: '余额充足，无冲突',
-  original_expression: '阿珍今天面部清洁1次，还买了舒缓保湿霜',
-  quantity: 1,
+function uniqueId(prefix) {
+  const random = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  return `${prefix}-${random}`
 }
 
-export default function ChatView({ draftInput, onDraftChange, sending, onSend, onStop }) {
-  const [messages, setMessages] = useState(() => [
-    { id: 'd0', kind: 'date', text: '今天' },
-    { id: 'm0', kind: 'ai-text', text: '下午好～今天想记点什么？' },
-    { id: 'm1', kind: 'owner', text: '阿珍今天面部清洁1次，还买了舒缓保湿霜' },
-    { id: 'm2', kind: 'confirm', proposal: MOCK_PROPOSAL },
-    { id: 'm3', kind: 'receipt', status: 'success', title: '已确认（Mock）', detail: '阶段2演示数据，未写入真实账本', result: ['面部清洁 1 次', '购买舒缓保湿霜 1 件'] },
-    { id: 'm4', kind: 'product', match: mockProductMatches.ambiguous },
-    { id: 'm5', kind: 'customer-record', record: mockCustomerRecord },
-    { id: 'm6', kind: 'customer-index', customers: mockCustomers },
-    { id: 'm7', kind: 'today', tasks: mockTodayTasks, groupLabels: todayTaskGroups },
-    { id: 'm8', kind: 'failure', text: '（示例）网络失败：请检查连接后重试' },
-  ])
+function getDeviceId() {
+  const key = 'facai-v2-device-id'
+  let value = window.localStorage.getItem(key)
+  if (!value) {
+    value = uniqueId('device')
+    window.localStorage.setItem(key, value)
+  }
+  return value
+}
+
+function dayLabel(value) {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+  return value === today ? '今天' : value
+}
+
+export default function ChatView({ draftInput, onDraftChange, onAuthoritativeWrite, onPendingChange }) {
+  const [messages, setMessages] = useState([])
+  const [pending, setPending] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [sending, setSending] = useState(false)
+  const [streamText, setStreamText] = useState('')
+  const [error, setError] = useState('')
+  const [cursor, setCursor] = useState(null)
+  const [hasMore, setHasMore] = useState(false)
   const bottomRef = useRef(null)
-  const listRef = useRef(null)
+  const confirmKeys = useRef(new Map())
+  const deviceId = useMemo(getDeviceId, [])
+
+  const refresh = useCallback(async ({ scroll = true } = {}) => {
+    const [history, pendingResult] = await Promise.all([
+      api.getChatHistory({ limit: 40 }),
+      api.getPendingActions(),
+    ])
+    setMessages(history.messages)
+    setCursor(history.next_cursor)
+    setHasMore(history.has_more)
+    setPending(pendingResult.items || [])
+    onPendingChange?.(pendingResult.items || [])
+    setLoading(false)
+    setError('')
+    history.messages.filter((m) => m.role === 'assistant' && !m.read_at).forEach((m) => {
+      api.markMessageRead(m.id).catch(() => {})
+    })
+    if (scroll) window.requestAnimationFrame(() => {
+      if (typeof bottomRef.current?.scrollIntoView === 'function') bottomRef.current.scrollIntoView({ block: 'end' })
+    })
+  }, [onPendingChange])
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: 'end' })
-  }, [messages])
+    refresh().catch((failure) => {
+      setLoading(false)
+      setError(failure.message)
+    })
+  }, [refresh])
 
-  const submit = () => {
-    const text = draftInput.trim()
-    if (!text || sending) return
-    onDraftChange('')
-    onSend?.(text)
-    setMessages((prev) => [
-      ...prev,
-      { id: `u-${Date.now()}`, kind: 'owner', text },
-      { id: `c-${Date.now()}`, kind: 'confirm', proposal: { ...MOCK_PROPOSAL, original_expression: text } },
-    ])
-  }
-
-  const renderMessage = (m) => {
-    switch (m.kind) {
-      case 'date':
-        return <div key={m.id} className="v2-day">{m.text}</div>
-      case 'owner':
-        return <div key={m.id} className="v2-msg owner">{m.text}</div>
-      case 'ai-text':
-        return <div key={m.id} className="v2-msg assistant">{m.text}</div>
-      case 'confirm':
-        return (
-          <div key={m.id} className="v2-msg-block">
-            <ConfirmCard proposal={m.proposal} onConfirm={() => {}} onCancel={() => {}} />
-          </div>
-        )
-      case 'receipt':
-        return (
-          <div key={m.id} className="v2-msg-block">
-            <ReceiptCard status={m.status} title={m.title} detail={m.detail} result={m.result} />
-          </div>
-        )
-      case 'product':
-        return (
-          <div key={m.id} className="v2-msg-block">
-            <ProductMatchCard match={m.match} onChoose={() => {}} onAddNew={() => {}} />
-          </div>
-        )
-      case 'customer-record':
-        return (
-          <div key={m.id} className="v2-msg-block">
-            <CustomerRecordCard record={m.record} onBackToList={() => {}} onOpenService={() => {}} />
-          </div>
-        )
-      case 'customer-index':
-        return (
-          <div key={m.id} className="v2-msg-block">
-            <CustomerIndexCard customers={m.customers} onOpenCustomer={() => {}} onBack={() => {}} />
-          </div>
-        )
-      case 'today':
-        return (
-          <div key={m.id} className="v2-msg-block">
-            <TodayTaskCard tasks={m.tasks} groupLabels={m.groupLabels} onRead={() => {}} onHandle={() => {}} onBack={() => {}} />
-          </div>
-        )
-      case 'failure':
-        return (
-          <div key={m.id} className="v2-msg-block">
-            <ReceiptCard status="failure" title="网络失败" detail={m.text} onRetry={() => {}} />
-          </div>
-        )
-      default:
-        return null
+  const loadEarlier = async () => {
+    if (!cursor) return
+    try {
+      const history = await api.getChatHistory({ before: cursor, limit: 40 })
+      setMessages((current) => [...history.messages, ...current])
+      setCursor(history.next_cursor)
+      setHasMore(history.has_more)
+    } catch (failure) {
+      setError(failure.message)
     }
   }
 
+  const submit = async () => {
+    const text = draftInput.trim()
+    if (!text || sending) return
+    setSending(true)
+    setError('')
+    try {
+      await api.streamChatTurn({
+        text,
+        request_id: uniqueId('turn'),
+        idempotency_key: uniqueId('turn-idem'),
+        device_id: deviceId,
+      }, (event, payload) => {
+        if (event === 'text_delta') setStreamText(payload.text || '')
+      })
+      onDraftChange('')
+      await refresh()
+    } catch (failure) {
+      setError(failure.message)
+    } finally {
+      setSending(false)
+      setStreamText('')
+    }
+  }
+
+  const keyFor = (proposal, action) => {
+    const mapKey = `${proposal.id}:${proposal.data_version}:${action}`
+    if (!confirmKeys.current.has(mapKey)) confirmKeys.current.set(mapKey, uniqueId(action))
+    return confirmKeys.current.get(mapKey)
+  }
+
+  const confirmProposal = async (proposal) => {
+    const result = await api.confirmStage3Proposal(proposal.id, {
+      idempotency_key: keyFor(proposal, 'confirm'), device_id: deviceId,
+      data_version: proposal.data_version,
+    })
+    await refresh()
+    onAuthoritativeWrite?.()
+    return result
+  }
+
+  const cancelProposal = async (proposal) => {
+    const result = await api.cancelStage3Proposal(proposal.id, {
+      idempotency_key: keyFor(proposal, 'cancel'), device_id: deviceId,
+    })
+    await refresh()
+    return result
+  }
+
+  const editProposal = async (proposal, draft) => {
+    const result = await api.editStage3Proposal(proposal.id, {
+      idempotency_key: keyFor(proposal, 'edit'), data_version: proposal.data_version,
+      occurred_on: draft.date, quantities: { 0: draft.quantity },
+    })
+    await refresh()
+    return result
+  }
+
+  const regenerateProposal = async (proposal) => {
+    const result = await api.regenerateStage3Proposal(proposal.id, {
+      request_id: uniqueId('regenerate'), idempotency_key: keyFor(proposal, 'regenerate'),
+      device_id: deviceId,
+    })
+    await refresh()
+    return result
+  }
+
+  const renderBlock = (block) => {
+    if (block.block_type === 'confirm_card') {
+      const proposal = { ...block.payload, status: block.state, data_version: block.data_version }
+      return (
+        <ConfirmCard
+          key={block.id}
+          proposal={proposal}
+          real
+          onConfirm={() => confirmProposal(proposal)}
+          onCancel={() => cancelProposal(proposal)}
+          onEdit={(draft) => editProposal(proposal, draft)}
+          onRegenerate={() => regenerateProposal(proposal)}
+        />
+      )
+    }
+    if (block.block_type === 'receipt_card') {
+      return <ReceiptCard key={block.id} {...block.payload} />
+    }
+    return null
+  }
+
+  let previousDate = null
+  const rendered = messages.map((message) => {
+    const showDate = message.session_date !== previousDate
+    previousDate = message.session_date
+    return (
+      <Fragment key={message.id}>
+        {showDate && <div className="v2-day" data-testid="date-separator">{dayLabel(message.session_date)}</div>}
+        {message.content && message.message_type !== 'block' && (
+          <div className={`v2-msg ${message.role === 'owner' ? 'owner' : 'assistant'}`}>{message.content}</div>
+        )}
+        {message.blocks?.map((block) => <div className="v2-msg-block" key={block.id}>{renderBlock(block)}</div>)}
+      </Fragment>
+    )
+  })
+
   return (
     <div className="v2-chat" data-testid="chat-view">
-      <div className="v2-chat-scroll" ref={listRef}>
-        {messages.map(renderMessage)}
-        {sending && <div className="v2-msg assistant"><span className="v2-spinner" /> 正在生成…（可停止）</div>}
+      <div className="v2-chat-scroll">
+        {hasMore && <button className="v2-link v2-load-earlier" onClick={loadEarlier}>加载更早消息</button>}
+        {pending.length > 0 && <div className="v2-pending-banner">有 {pending.length} 项未完成确认，可跨日继续或放弃</div>}
+        {loading && <div className="v2-state">正在恢复主对话…</div>}
+        {!loading && messages.length === 0 && <div className="v2-msg assistant">你好，记账时请写明客户化名、已有服务、次数和日期。</div>}
+        {rendered}
+        {sending && <div className="v2-msg assistant"><span className="v2-spinner" /> {streamText || '正在保存并生成统一确认卡…'}</div>}
+        {error && <div className="v2-msg-block"><ReceiptCard status="failure" title="请求失败" detail={`${error}；输入草稿已保留。`} onRetry={submit} /></div>}
         <div ref={bottomRef} />
       </div>
-      <ChatComposer input={draftInput} onInputChange={onDraftChange} onSend={submit} sending={sending} onStop={onStop} />
+      <ChatComposer input={draftInput} onInputChange={onDraftChange} onSend={submit} sending={sending} onStop={() => setSending(false)} />
     </div>
   )
 }

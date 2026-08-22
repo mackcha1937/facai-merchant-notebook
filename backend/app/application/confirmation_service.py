@@ -288,7 +288,9 @@ def _do_create_package(db: Session, customer: Customer, action, proposal) -> dic
 
 
 def _do_consume_service(db: Session, customer: Customer, action, proposal, occurred_on: str) -> dict:
-    package, _, preview = _resolve_consume(db, customer, action)
+    package, error, preview = _resolve_consume(db, customer, action)
+    if error:
+        raise DomainError(error)
     service = service_repo.get_service(db, action.service_id)
     ledger_repo.create_ledger_entry(
         db,

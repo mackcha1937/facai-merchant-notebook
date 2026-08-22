@@ -1,0 +1,13 @@
+{
+  "status": "通过",
+  "backend": "168 项通过（含阶段1、阶段2与阶段3回归）",
+  "frontend": "34 项通过（6 个测试文件）",
+  "build": "Vite 生产构建通过（74 modules transformed）",
+  "sensitive_scan": "通过；唯一命中为既有脱敏单测中的虚构 key，应用、产物与交付文档无命中",
+  "migration_cycle": "0014 → 0016 → 0014 → 0016，通过且 integrity_check=ok",
+  "data_integrity": {
+    "before": "客户4 / 套餐3 / 账本4（有效3）/ 剩余10",
+    "after": "客户4 / 套餐3 / 账本4（有效3）/ 剩余10"
+  },
+  "browser": "Chromium 实测：1470×771 桌面、390×844 手机；SSE 持久化与刷新恢复、权威客户卡、按钮/浏览器返回、焦点恢复与三项抽屉通过"
+}

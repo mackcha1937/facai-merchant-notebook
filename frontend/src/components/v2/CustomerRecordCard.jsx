@@ -18,6 +18,22 @@ export default function CustomerRecordCard({ record, onBackToList, onOpenService
   const [active, setActive] = useState('overview')
 
   if (!record) return null
+  const overview = record.overview || {
+    since: '—',
+    total_consumption_count: (record.recent_entries || []).filter((entry) => entry.entry_type !== 'package_purchase').length,
+    total_spend_cents: (record.recent_entries || []).reduce((sum, entry) => sum + (entry.price_cents || 0), 0),
+    service_type_count: record.service_type_count || 0,
+    active_package_count: record.active_package_count || 0,
+  }
+  const facts = record.facts || []
+  const services = (record.services || []).map((service) => ({
+    ...service,
+    id: service.id ?? service.service_id,
+    name: service.name ?? service.service_name,
+  }))
+  const products = record.products || []
+  const followUps = record.follow_ups || []
+  const ledgerHistory = record.ledger_history || record.recent_entries || []
 
   return (
     <div className="v2-block v2-record" data-testid="customer-record-card">
@@ -42,28 +58,30 @@ export default function CustomerRecordCard({ record, onBackToList, onOpenService
 
       {active === 'overview' && (
         <div className="v2-section">
-          <div className="v2-kv"><span className="k">成为客户</span><span className="v">{record.overview.since}</span></div>
-          <div className="v2-kv"><span className="k">累计消费</span><span className="v">{record.overview.total_consumption_count} 次</span></div>
-          <div className="v2-kv"><span className="k">累计金额</span><span className="v">¥{(record.overview.total_spend_cents / 100).toFixed(0)}</span></div>
-          <div className="v2-kv"><span className="k">服务类型</span><span className="v">{record.overview.service_type_count} 类</span></div>
-          <div className="v2-kv"><span className="k">有效套餐</span><span className="v">{record.overview.active_package_count} 个</span></div>
+          <div className="v2-kv"><span className="k">成为客户</span><span className="v">{overview.since}</span></div>
+          <div className="v2-kv"><span className="k">近期消费记录</span><span className="v">{overview.total_consumption_count} 次</span></div>
+          <div className="v2-kv"><span className="k">近期金额</span><span className="v">¥{(overview.total_spend_cents / 100).toFixed(0)}</span></div>
+          <div className="v2-kv"><span className="k">服务类型</span><span className="v">{overview.service_type_count} 类</span></div>
+          <div className="v2-kv"><span className="k">有效套餐</span><span className="v">{overview.active_package_count} 个</span></div>
+          {record.authoritative && <div className="v2-kv"><span className="k">数据版本</span><span className="v ok">权威 #{record.data_version}</span></div>}
         </div>
       )}
 
       {active === 'facts' && (
         <div className="v2-section">
-          {record.facts.map((f) => (
+          {facts.map((f) => (
             <div key={f.id} className="v2-kv">
               <span className="k">{f.type}{f.confirmed ? ' · 已确认' : ' · 待确认'}</span>
               <span className="v">{f.value}</span>
             </div>
           ))}
+          {facts.length === 0 && <div className="v2-state">阶段3不创建客户事实</div>}
         </div>
       )}
 
       {active === 'services' && (
         <div className="v2-section">
-          {record.services.map((s) => (
+          {services.map((s) => (
             <button key={s.id} className="v2-candidate" onClick={() => onOpenService?.(s.id)}>
               <span className="v2-candidate-main">
                 <strong>{s.name}</strong>
@@ -72,40 +90,43 @@ export default function CustomerRecordCard({ record, onBackToList, onOpenService
               <span className="v2-chevron">›</span>
             </button>
           ))}
-          <p className="v2-hint">（演示：服务类型多时不铺开，点击查看第二级详情）</p>
+          {services.length === 0 && <div className="v2-state">暂无服务数据</div>}
         </div>
       )}
 
       {active === 'products' && (
         <div className="v2-section">
-          {record.products.map((p) => (
+          {products.map((p) => (
             <div key={p.id} className="v2-kv">
               <span className="k">{p.name}</span>
               <span className="v">最近 {p.last_purchased_at} · 共{p.purchase_count}次</span>
             </div>
           ))}
+          {products.length === 0 && <div className="v2-state">阶段3不新增产品识别</div>}
         </div>
       )}
 
       {active === 'follow_ups' && (
         <div className="v2-section">
-          {record.follow_ups.map((f) => (
+          {followUps.map((f) => (
             <div key={f.id} className="v2-kv">
               <span className="k">{f.type}</span>
               <span className="v">{f.summary}（{f.date}）</span>
             </div>
           ))}
+          {followUps.length === 0 && <div className="v2-state">暂无跟进事项</div>}
         </div>
       )}
 
       {active === 'history' && (
         <div className="v2-section">
-          {record.ledger_history.map((l) => (
+          {ledgerHistory.map((l) => (
             <div key={l.id} className="v2-kv">
-              <span className="k">{l.name}</span>
+              <span className="k">{l.name || l.service_name || l.product_name || '账本记录'}</span>
               <span className="v">{l.entry_type === 'product_purchase' ? '商品购买' : l.entry_type === 'package_consumption' ? '套餐核销' : '一次性服务'} · {l.occurred_on} · {l.quantity}次</span>
             </div>
           ))}
+          {ledgerHistory.length === 0 && <div className="v2-state">暂无账本历史</div>}
         </div>
       )}
     </div>

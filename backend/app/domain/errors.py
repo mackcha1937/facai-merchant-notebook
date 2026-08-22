@@ -11,3 +11,11 @@ class NotFoundError(Exception):
 
 class PermissionDeniedError(Exception):
     """权限不足，对应 HTTP 403。"""
+
+
+class ConflictError(Exception):
+    """可恢复的数据/并发冲突，对应 HTTP 409。"""
+
+    def __init__(self, message: str, payload: dict | None = None):
+        super().__init__(message)
+        self.payload = payload or {}

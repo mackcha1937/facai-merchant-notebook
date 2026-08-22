@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     # 本地开发默认身份（正式登录未实现前）。生产环境应设为 False，缺失上下文时 fail closed。
     local_dev_owner_enabled: bool = True
     local_default_tenant_id: int = 1
+    local_default_owner_id: int = 1
     local_default_owner_role: str = "owner"
 
     # 前端开发服务器跨域来源（多个用英文逗号分隔）

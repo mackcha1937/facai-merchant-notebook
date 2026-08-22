@@ -6,19 +6,73 @@ async function request(path, options = {}) {
   })
   if (!res.ok) {
     let detail = `请求失败（HTTP ${res.status}）`
+    let payload = null
     try {
-      const data = await res.json()
-      if (data && data.detail) detail = data.detail
+      payload = await res.json()
+      if (payload && payload.detail) detail = payload.detail
     } catch (e) {
       /* 忽略解析错误 */
     }
-    throw new Error(detail)
+    const error = new Error(detail)
+    error.status = res.status
+    error.payload = payload
+    throw error
   }
   if (res.status === 204) return null
   return res.json()
 }
 
 export const api = {
+  // 阶段3持续主会话与统一 Proposal
+  getMainThread: () => request('/api/owner/chat/thread'),
+  getChatHistory: ({ before, limit = 30 } = {}) => {
+    const params = new URLSearchParams({ limit: String(limit) })
+    if (before) params.set('before', String(before))
+    return request(`/api/owner/chat/history?${params}`)
+  },
+  getPendingActions: () => request('/api/owner/chat/pending'),
+  sendChatTurn: (data) => request('/api/owner/chat/turn', { method: 'POST', body: JSON.stringify(data) }),
+  streamChatTurn: async (data, onEvent = () => {}) => {
+    const res = await fetch('/api/owner/chat/turn/stream', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+    })
+    if (!res.ok) {
+      let payload = null
+      try { payload = await res.json() } catch { payload = null }
+      const error = new Error(payload?.detail || `请求失败（HTTP ${res.status}）`)
+      error.status = res.status
+      error.payload = payload
+      throw error
+    }
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let finalResult = null
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const frames = buffer.split('\n\n')
+      buffer = frames.pop() || ''
+      for (const frame of frames) {
+        const event = frame.match(/^event:\s*(.+)$/m)?.[1]
+        const raw = frame.match(/^data:\s*(.+)$/m)?.[1]
+        if (!event || !raw) continue
+        const payload = JSON.parse(raw)
+        onEvent(event, payload)
+        if (event === 'validated_block') finalResult = payload
+      }
+    }
+    return finalResult
+  },
+  markMessageRead: (id) => request(`/api/owner/messages/${id}/read`, { method: 'POST' }),
+  markPendingRead: (id) => request(`/api/owner/pending/${id}/read`, { method: 'POST' }),
+  confirmStage3Proposal: (id, data) => request(`/api/owner/proposals/${id}/confirm`, { method: 'POST', body: JSON.stringify(data) }),
+  cancelStage3Proposal: (id, data) => request(`/api/owner/proposals/${id}/cancel`, { method: 'POST', body: JSON.stringify(data) }),
+  editStage3Proposal: (id, data) => request(`/api/owner/proposals/${id}/edit`, { method: 'POST', body: JSON.stringify(data) }),
+  regenerateStage3Proposal: (id, data) => request(`/api/owner/proposals/${id}/regenerate`, { method: 'POST', body: JSON.stringify(data) }),
+  getAuthoritativeCustomerRecord: (id) => request(`/api/owner/customers/${id}/record`),
+  getStage3Status: () => request('/api/v2-stage3/status'),
   // 客户
   getCustomers: (search) =>
     request(`/api/customers${search ? `?search=${encodeURIComponent(search)}` : '?sort=last_consumed_desc'}`),

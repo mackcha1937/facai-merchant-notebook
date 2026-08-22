@@ -238,6 +238,21 @@
   vertical-align: -2px;
 }
 
+.v2-pending-banner,
+.v2-inline-error {
+  margin: 8px 14px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: #fff7e6;
+  color: #8a5a00;
+  font-size: 13px;
+}
+
+.v2-load-earlier {
+  display: block;
+  margin: 0 auto 12px;
+}
+
 /* ============ 输入区 ============ */
 .v2-composer-wrap {
   flex: none;

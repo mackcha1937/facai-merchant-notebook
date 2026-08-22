@@ -11,6 +11,7 @@ from app.domain.errors import DomainError
 
 _current_tenant_id: ContextVar[int | None] = ContextVar("current_tenant_id", default=None)
 _current_user_role: ContextVar[str | None] = ContextVar("current_user_role", default=None)
+_current_user_id: ContextVar[int | None] = ContextVar("current_user_id", default=None)
 
 
 def get_current_tenant_id() -> int:
@@ -33,9 +34,23 @@ def get_current_role() -> str:
     raise DomainError("缺少用户上下文，拒绝请求")
 
 
+def get_current_owner_id() -> int:
+    user_id = _current_user_id.get()
+    if user_id is not None:
+        return user_id
+    settings = get_settings()
+    if settings.local_dev_owner_enabled:
+        return settings.local_default_owner_id
+    raise DomainError("缺少用户上下文，拒绝请求")
+
+
 def set_current_tenant_id(tenant_id: int | None):
     return _current_tenant_id.set(tenant_id)
 
 
 def set_current_role(role: str | None):
     return _current_user_role.set(role)
+
+
+def set_current_owner_id(owner_id: int | None):
+    return _current_user_id.set(owner_id)
