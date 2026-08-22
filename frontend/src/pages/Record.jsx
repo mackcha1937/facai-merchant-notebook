@@ -48,13 +48,13 @@ export default function Record() {
   return (
     <main className="page">
       <h1>记账（自然语言）</h1>
-      <p className="subtitle">用一句话记录，例如：小蓝今天肩颈按摩1次。</p>
+      <p className="subtitle">用一句话记录，例如：王姐今天肩颈按摩1次。</p>
 
       <section className="card">
         <textarea
           className="input-area"
           rows={3}
-          placeholder="例如：小蓝来店里做了面部清洁，清痘，还买了一个面霜。"
+          placeholder="例如：王姐来店里做了面部清洁，清痘，还买了一个面霜。"
           value={text}
           onChange={(e) => setText(e.target.value)}
         />

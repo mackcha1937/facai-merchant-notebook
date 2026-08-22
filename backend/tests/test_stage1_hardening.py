@@ -4,13 +4,11 @@ import sqlite3
 import pytest
 from alembic import command
 from alembic.config import Config
-from fastapi.testclient import TestClient
 from pathlib import Path
 
 from app.core.rbac import require_admin, require_owner
 from app.core.tenant import get_current_role, get_current_tenant_id, set_current_role, set_current_tenant_id
 from app.domain.errors import DomainError
-from app.main import app
 from app.repositories import customers as customer_repo
 from app.repositories import packages as package_repo
 from app.repositories import proposals as proposal_repo
@@ -133,25 +131,16 @@ def test_cross_tenant_trash_isolation(db_session):
 
 # ---------- RBAC API ----------
 
-def test_owner_cannot_call_admin_api(monkeypatch):
-    from app.core import config as config_module
-
-    monkeypatch.setattr(config_module.get_settings(), "local_dev_owner_enabled", True)
-    monkeypatch.setattr(config_module.get_settings(), "local_default_owner_role", "owner")
+def test_owner_cannot_call_admin_api(client):
     set_current_role("owner")
-    client = TestClient(app)
     # 提示词保存需要 admin，owner 应 403（PermissionDeniedError 映射 403）
     resp = client.post("/api/settings/prompt/versions", json={"content": "测试提示词 包含 JSON"})
     assert resp.status_code == 403
     assert "无权限" in resp.json()["detail"]
 
 
-def test_admin_can_call_admin_api(monkeypatch):
-    from app.core import config as config_module
-
-    monkeypatch.setattr(config_module.get_settings(), "local_dev_owner_enabled", True)
+def test_admin_can_call_admin_api(client):
     set_current_role("admin")
-    client = TestClient(app)
     resp = client.post("/api/settings/prompt/versions", json={"content": "测试提示词 包含 JSON 输出"})
     assert resp.status_code == 201
 

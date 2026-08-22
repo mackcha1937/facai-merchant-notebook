@@ -119,7 +119,7 @@ function CustomersTab({ onError }) {
     <div>
       <div className="search-bar">
         <input
-          placeholder="搜索客户化名或别名，如：小红 / 红姐"
+          placeholder="搜索客户化名或别名，如：阿珍 / 珍姐"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />

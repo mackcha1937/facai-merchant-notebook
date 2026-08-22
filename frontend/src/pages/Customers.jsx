@@ -43,7 +43,7 @@ export default function Customers() {
       {error && <div className="error-banner">{error}</div>}
 
       <div className="search-bar">
-        <input placeholder="搜索化名或别名，如：小红 / 红姐" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input placeholder="搜索化名或别名，如：阿珍 / 珍姐" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
 
       <form className="inline-form" onSubmit={createCustomer}>

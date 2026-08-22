@@ -116,7 +116,7 @@ export default function PromptSettings() {
           <textarea
             className="v1-textarea"
             rows={2}
-            placeholder="例如：小红今天买了一盒面膜。"
+            placeholder="例如：阿珍今天买了一盒面膜。"
             value={testText}
             onChange={(e) => setTestText(e.target.value)}
           />

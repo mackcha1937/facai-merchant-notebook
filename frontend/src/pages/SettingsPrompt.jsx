@@ -128,7 +128,7 @@ export default function SettingsPrompt() {
         <textarea
           className="input-area"
           rows={2}
-          placeholder="输入一条化名测试表达，如：小红今天买了一盒面膜。"
+          placeholder="输入一条化名测试表达，如：阿珍今天买了一盒面膜。"
           value={testText}
           onChange={(e) => setTestText(e.target.value)}
         />

@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     # 阶段1 验证状态接口开关（仅开发环境显式开启，生产默认关闭）
     enable_stage1_verify: bool = False
 
+    # 阶段2 验证状态接口开关（仅开发环境显式开启，生产默认关闭）
+    enable_stage2_verify: bool = False
+
     # 本地开发默认身份（正式登录未实现前）。生产环境应设为 False，缺失上下文时 fail closed。
     local_dev_owner_enabled: bool = True
     local_default_tenant_id: int = 1
