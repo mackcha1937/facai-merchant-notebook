@@ -49,5 +49,9 @@ def upgrade() -> None:
 def downgrade() -> None:
     bind = op.get_bind()
     bind.exec_driver_sql("PRAGMA foreign_keys=OFF")
+    # 删除 product_id 索引
     op.drop_index("ix_ledger_product_id", table_name="ledger_entries")
-    # product_id 外键随 batch 重建移除；不删除 product_name 和 product 草稿（保留 V1 权威数据）
+    # 明确删除 fk_ledger_product 外键（batch 重建移除）
+    with op.batch_alter_table("ledger_entries", recreate="always") as batch:
+        batch.drop_constraint("fk_ledger_product", type_="foreignkey")
+    # 不删除 product_name 和历史 Product 草稿

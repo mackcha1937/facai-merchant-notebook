@@ -2,15 +2,19 @@ import { useEffect, useState } from 'react'
 import AppHeader from '../../components/v1/AppHeader.jsx'
 
 const TEST_RESULTS = [
-  ['V1 原有测试', '100 通过'],
-  ['Alembic 空库升级到最新版', '通过'],
+  ['全量自动测试', '133 通过'],
+  ['Alembic 空库升级到 0014', '通过'],
   ['Migration downgrade 安全（V1表不删）', '通过'],
+  ['回滚一致性 head→0011 / head→0008→head', '通过'],
   ['默认 tenant 回填', '通过'],
-  ['tenant_id NOT NULL（PRAGMA）', '通过'],
+  ['tenant_id NOT NULL / 外键 / 索引（PRAGMA）', '通过'],
   ['非法 tenant 外键写入失败', '通过'],
   ['缺少租户上下文 fail-closed', '通过'],
   ['跨租户客户/套餐/提示词/Proposal/回收站隔离', '通过'],
   ['owner 调用 admin 接口拒绝(403)', '通过'],
+  ['model-status 仅 owner/admin 可读（无上下文拒绝）', '通过'],
+  ['阶段1验证接口受 ENABLE_STAGE1_VERIFY 开关保护', '通过'],
+  ['Product 唯一约束（0014 部分唯一索引）', '通过'],
   ['账本余额与核销回归', '通过'],
   ['Migration 幂等/重复执行', '通过'],
   ['历史 product_name 草稿映射', '通过'],
@@ -87,6 +91,25 @@ export default function VerifyV2Stage1() {
         </div>
 
         <div className="v1-panel">
+          <h2>Product 唯一约束（0014）</h2>
+          {status ? (
+            <>
+              <div className="v1-row">
+                <span className="k">uq_products_tenant_name 部分唯一索引</span>
+                <span className={`v ${status.product_unique_constraint ? 'ok' : 'bad'}`}>{status.product_unique_constraint ? '已创建' : '缺失'}</span>
+              </div>
+              <div className="v1-row">
+                <span className="k">未删除的同租户重名商品</span>
+                <span className={`v ${status.duplicate_active_products === 0 ? 'ok' : 'bad'}`}>{status.duplicate_active_products}（应为0）</span>
+              </div>
+              <div className="v1-row"><span className="k">规则</span><span className="v">tenant_id + canonical_name 未删除时唯一；不同租户可同名；软删后可重建</span></div>
+            </>
+          ) : (
+            <div className="v1-state"><span className="v1-spinner" /></div>
+          )}
+        </div>
+
+        <div className="v1-panel">
           <h2>V1 数据完整性（迁移前 vs 后）</h2>
           <p className="v1-hint">迁移前基线：</p>
           {BASELINE_BEFORE.map(([k, v]) => (
@@ -116,7 +139,7 @@ export default function VerifyV2Stage1() {
         <div className="v1-panel">
           <h2>回滚验证</h2>
           <p className="v1-hint">
-            `alembic downgrade 0001_baseline` 后：V1 七张表保留、新表移除、账本数据不删；可再 `upgrade head` 恢复。已用临时库验证通过。
+            已用临时库验证：`alembic downgrade 0008_release` 后 V1 七张表保留、tenant_id 恢复可空、无外键、账本数据不丢；`head→0011` 与 `head→0008→head` 结构一致，可再 `upgrade head` 恢复。
           </p>
         </div>
       </div>

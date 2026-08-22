@@ -2,8 +2,12 @@
 
 
 class DomainError(Exception):
-    """业务规则错误，对应 HTTP 400。"""
+    """业务规则/参数错误，对应 HTTP 400。"""
 
 
 class NotFoundError(Exception):
     """资源不存在，对应 HTTP 404。"""
+
+
+class PermissionDeniedError(Exception):
+    """权限不足，对应 HTTP 403。"""

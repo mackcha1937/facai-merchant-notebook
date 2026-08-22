@@ -24,7 +24,7 @@ from app.api.routes import (
 from app.core.config import get_settings
 from app.core.database import init_db
 from app.core.logging import SanitizingFilter
-from app.domain.errors import DomainError, NotFoundError
+from app.domain.errors import DomainError, NotFoundError, PermissionDeniedError
 
 settings = get_settings()
 
@@ -69,6 +69,11 @@ app.add_middleware(
 @app.exception_handler(DomainError)
 async def domain_error_handler(_request: Request, exc: DomainError):
     return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+
+@app.exception_handler(PermissionDeniedError)
+async def permission_denied_handler(_request: Request, exc: PermissionDeniedError):
+    return JSONResponse(status_code=403, content={"detail": str(exc)})
 
 
 @app.exception_handler(NotFoundError)

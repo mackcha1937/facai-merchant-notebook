@@ -5,7 +5,7 @@
 - require_owner / require_admin 默认从当前用户上下文取角色；
   缺少上下文时（生产环境）拒绝请求。
 """
-from app.domain.errors import DomainError
+from app.domain.errors import PermissionDeniedError
 
 OWNER = "owner"
 ADMIN = "admin"
@@ -13,7 +13,7 @@ ADMIN = "admin"
 
 def require_role(role: str | None, allowed: set[str]) -> None:
     if role not in allowed:
-        raise DomainError("无权限执行该操作")
+        raise PermissionDeniedError("无权限执行该操作")
 
 
 def _resolve_role(role: str | None) -> str:

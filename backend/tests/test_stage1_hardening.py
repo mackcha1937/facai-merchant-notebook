@@ -140,9 +140,9 @@ def test_owner_cannot_call_admin_api(monkeypatch):
     monkeypatch.setattr(config_module.get_settings(), "local_default_owner_role", "owner")
     set_current_role("owner")
     client = TestClient(app)
-    # 提示词保存需要 admin，owner 应 400（DomainError 映射 400）
+    # 提示词保存需要 admin，owner 应 403（PermissionDeniedError 映射 403）
     resp = client.post("/api/settings/prompt/versions", json={"content": "测试提示词 包含 JSON"})
-    assert resp.status_code == 400
+    assert resp.status_code == 403
     assert "无权限" in resp.json()["detail"]
 
 

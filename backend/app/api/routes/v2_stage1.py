@@ -1,9 +1,12 @@
-"""V2 阶段1：数据基础/Migration/权限状态接口（只读，不返回敏感信息）。"""
+"""V2 阶段1：数据基础/Migration/权限状态接口（只读，不返回敏感信息）。
+
+受 ENABLE_STAGE1_VERIFY 开关保护，默认关闭，仅开发环境显式开启。
+"""
 import sqlite3
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
-from app.core.config import BACKEND_ROOT
+from app.core.config import BACKEND_ROOT, get_settings
 
 router = APIRouter(prefix="/api/v2/stage1", tags=["v2-stage1"])
 
@@ -16,6 +19,9 @@ def _db():
 
 @router.get("/status")
 def stage1_status():
+    settings = get_settings()
+    if not settings.enable_stage1_verify:
+        raise HTTPException(status_code=403, detail="阶段1验证接口未开启（ENABLE_STAGE1_VERIFY=false）")
     conn = _db()
     try:
         cur = conn.cursor()
@@ -62,6 +68,15 @@ def stage1_status():
         cur.execute("PRAGMA foreign_keys=ON")
         fk_check = cur.execute("PRAGMA foreign_key_check").fetchall()
 
+        # Product 唯一约束（0014）：tenant_id + canonical_name 未删除时唯一
+        product_unique_index = cur.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND name='uq_products_tenant_name'"
+        ).fetchone()
+        duplicate_active_products = cur.execute(
+            "SELECT COUNT(*) FROM (SELECT 1 FROM products WHERE deleted_at IS NULL "
+            "GROUP BY tenant_id, canonical_name HAVING COUNT(*) > 1)"
+        ).fetchone()[0]
+
         return {
             "migration_version": migration_version,
             "table_count": len(all_tables),
@@ -76,6 +91,8 @@ def stage1_status():
             "missing_tenant_fk": missing_fk,
             "duplicate_fk": duplicate_fk,
             "fk_check_errors": len(fk_check),
+            "product_unique_constraint": product_unique_index is not None,
+            "duplicate_active_products": duplicate_active_products,
             "v1_baseline": {
                 "customer_count": customer_count,
                 "package_count": package_count,

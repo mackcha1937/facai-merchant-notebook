@@ -3,7 +3,7 @@ import pytest
 
 from app.core.rbac import require_admin, require_owner
 from app.core.tenant import set_current_tenant_id
-from app.domain.errors import DomainError
+from app.domain.errors import PermissionDeniedError
 from app.repositories import customers as customer_repo
 from app.repositories import services as service_repo
 
@@ -57,7 +57,7 @@ def test_rbac_owner_vs_admin():
     require_owner("owner")
     require_owner("admin")
     # owner 不能管理 AI 配置
-    with pytest.raises(DomainError):
+    with pytest.raises(PermissionDeniedError):
         require_admin("owner")
     require_admin("admin")
     # 无角色（None）在开发环境默认 owner，不做拒绝断言；

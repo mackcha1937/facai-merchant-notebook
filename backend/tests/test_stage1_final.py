@@ -9,7 +9,6 @@ from fastapi.testclient import TestClient
 
 from app.core.rbac import require_admin, require_owner
 from app.core.tenant import set_current_role, set_current_tenant_id
-from app.domain.errors import DomainError
 from app.main import app
 from app.repositories import customers as customer_repo
 from app.repositories import services as service_repo
@@ -133,13 +132,13 @@ def _owner_client(monkeypatch):
 
 def test_owner_cannot_read_prompt(monkeypatch):
     c = _owner_client(monkeypatch)
-    assert c.get("/api/settings/prompt").status_code == 400
-    assert c.get("/api/settings/prompt/versions").status_code == 400
+    assert c.get("/api/settings/prompt").status_code == 403
+    assert c.get("/api/settings/prompt/versions").status_code == 403
 
 
 def test_owner_cannot_model_check(monkeypatch):
     c = _owner_client(monkeypatch)
-    assert c.post("/api/model/check").status_code == 400
+    assert c.post("/api/model/check").status_code == 403
 
 
 def test_owner_can_read_model_status(monkeypatch):
@@ -212,3 +211,57 @@ def test_cross_tenant_parent_write_rejected(db_session):
         package_service.create_package(db_session, cust.id, PackageCreate(service_id=svc.id, total_count=5))
     # 跨租户父对象应返回“不存在”或权限拒绝，不泄露租户1 对象存在
     assert "不存在" in str(exc.value)
+
+
+# ---------- 六、Product 唯一约束（0014） ----------
+
+def test_product_unique_constraint_behavior(tmp_path):
+    cfg, db = _cfg(tmp_path)
+    command.upgrade(cfg, "head")
+    conn = sqlite3.connect(str(db))
+    conn.execute("PRAGMA foreign_keys=ON")
+
+    # 唯一索引存在
+    idx = conn.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='uq_products_tenant_name'").fetchone()
+    assert idx is not None, "0014 应创建 uq_products_tenant_name 部分唯一索引"
+
+    # 准备租户2（默认只回填租户1）
+    conn.execute("INSERT INTO tenants (id, display_name, status, created_at, updated_at) VALUES (2, 'B店', 'active', datetime('now'), datetime('now'))")
+
+    # 同租户同名未删除 → 拒绝
+    conn.execute("INSERT INTO products (tenant_id, canonical_name, lifecycle_status, knowledge_status, version, created_at, updated_at) VALUES (1, '面膜', 'draft', 'incomplete', 1, datetime('now'), datetime('now'))")
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute("INSERT INTO products (tenant_id, canonical_name, lifecycle_status, knowledge_status, version, created_at, updated_at) VALUES (1, '面膜', 'draft', 'incomplete', 1, datetime('now'), datetime('now'))")
+
+    # 不同租户同名 → 允许
+    conn.execute("INSERT INTO products (tenant_id, canonical_name, lifecycle_status, knowledge_status, version, created_at, updated_at) VALUES (2, '面膜', 'draft', 'incomplete', 1, datetime('now'), datetime('now'))")
+
+    # 已删除的同名 → 允许（部分索引只约束未删除行）
+    conn.execute("INSERT INTO products (tenant_id, canonical_name, lifecycle_status, knowledge_status, version, created_at, updated_at, deleted_at) VALUES (1, '面膜', 'draft', 'incomplete', 1, datetime('now'), datetime('now'), datetime('now'))")
+    conn.close()
+
+
+# ---------- 七、验证接口与 model-status 权限 ----------
+
+def test_stage1_status_requires_enable_flag(monkeypatch):
+    from types import SimpleNamespace
+
+    import app.api.routes.v2_stage1 as v2_stage1
+
+    # 关闭开关 → 403，不暴露数据
+    monkeypatch.setattr(v2_stage1, "get_settings", lambda: SimpleNamespace(enable_stage1_verify=False))
+    c = TestClient(app)
+    resp = c.get("/api/v2/stage1/status")
+    assert resp.status_code == 403
+    assert "未开启" in resp.json()["detail"]
+
+
+def test_model_status_fail_closed_without_context(monkeypatch):
+    from app.core import config as config_module
+
+    monkeypatch.setattr(config_module.get_settings(), "local_dev_owner_enabled", False)
+    set_current_role(None)
+    c = TestClient(app)
+    resp = c.get("/api/config/model-status")
+    assert resp.status_code == 400
+    assert "缺少用户上下文" in resp.json()["detail"]

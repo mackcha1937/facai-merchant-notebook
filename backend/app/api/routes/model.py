@@ -6,7 +6,7 @@
 from fastapi import APIRouter, Depends
 
 from app.core.config import Settings, get_settings
-from app.core.rbac import require_admin
+from app.core.rbac import require_admin, require_owner
 from app.infrastructure.llm.deepseek import DeepSeekAdapter
 
 router = APIRouter(tags=["model"])
@@ -14,7 +14,8 @@ router = APIRouter(tags=["model"])
 
 @router.get("/api/config/model-status")
 def model_status(settings: Settings = Depends(get_settings)) -> dict:
-    """返回模型是否已配置（不返回密钥）。"""
+    """返回模型是否已配置（脱敏，owner/admin 可读，不返回密钥）。"""
+    require_owner()
     return {
         "configured": settings.is_model_configured,
         "model_id": settings.deepseek_model_id,

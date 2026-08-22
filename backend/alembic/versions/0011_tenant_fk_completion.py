@@ -143,9 +143,10 @@ def _rebuild_customer_aliases(bind):
 def downgrade() -> None:
     bind = op.get_bind()
     bind.exec_driver_sql("PRAGMA foreign_keys=OFF")
-    # 移除 18 表 tenant 索引（外键随表结构保留，不删除数据）
+    # 撤销 0011 新增的 18 表 tenant 外键 + 索引
     for table in MISSING_TENANT_FK:
-        try:
-            op.drop_index(f"ix_{table}_tenant_id", table_name=table)
-        except Exception:
-            raise
+        op.drop_index(f"ix_{table}_tenant_id", table_name=table)
+        with op.batch_alter_table(table) as batch:
+            batch.drop_constraint(f"fk_{table}_tenant", type_="foreignkey")
+    # packages/ledger_entries/customer_aliases 的重建由 0009 downgrade 恢复到 0008 结构，
+    # 此处不再重复处理（避免与 0009 downgrade 冲突）。
