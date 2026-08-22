@@ -265,3 +265,97 @@ def test_model_status_fail_closed_without_context(monkeypatch):
     resp = c.get("/api/config/model-status")
     assert resp.status_code == 400
     assert "缺少用户上下文" in resp.json()["detail"]
+
+
+# ---------- 八、0008 双数据库完整结构对比 ----------
+
+def _snapshot_all_tables(db):
+    conn = sqlite3.connect(str(db))
+    tables = [r[0] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+    ).fetchall()]
+    snap = {}
+    for t in tables:
+        cols = conn.execute(f"PRAGMA table_info({t})").fetchall()
+        fks = conn.execute(f"PRAGMA foreign_key_list({t})").fetchall()
+        idxs = conn.execute(f"PRAGMA index_list({t})").fetchall()
+        snap[t] = {
+            "cols": [(c[1], c[2], c[3], c[5]) for c in cols],
+            "fks": sorted((f[3], f[2], f[4]) for f in fks),
+            "idxs": sorted((i[1], i[2], i[4]) for i in idxs),
+        }
+    conn.close()
+    return snap
+
+
+def test_head_downgrade_0008_full_structure_match(tmp_path):
+    def make_cfg(db_path):
+        cfg = Config(str(BACKEND_ROOT / "alembic.ini"))
+        cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db_path}")
+        cfg.set_main_option("script_location", str(BACKEND_ROOT / "alembic"))
+        return cfg
+
+    db_a = tmp_path / "a.db"
+    db_b = tmp_path / "b.db"
+
+    # A：直接 upgrade 到 0008
+    command.upgrade(make_cfg(db_a), "0008_release")
+    snap_a = _snapshot_all_tables(db_a)
+
+    # B：head 后 downgrade 到 0008
+    command.upgrade(make_cfg(db_b), "head")
+    command.downgrade(make_cfg(db_b), "0008_release")
+    snap_b = _snapshot_all_tables(db_b)
+
+    assert set(snap_a) == set(snap_b), f"表集合不一致：{set(snap_a) ^ set(snap_b)}"
+    for t in sorted(snap_a):
+        assert snap_a[t] == snap_b[t], f"表 {t} 结构不一致：\nA={snap_a[t]}\nB={snap_b[t]}"
+
+
+# ---------- 九、0014 商品名 TRIM 后 product_id 保留 ----------
+
+def test_0014_trim_preserves_product_id_and_merges(tmp_path):
+    cfg, db = _cfg(tmp_path)
+    command.upgrade(cfg, "0013_tenant_index_completion")
+    conn = sqlite3.connect(str(db))
+    conn.execute("PRAGMA foreign_keys=ON")
+
+    # 租户2 与客户（tenant_id 外键要求）
+    conn.execute("INSERT INTO tenants (id, display_name, status, created_at, updated_at) VALUES (2, 'B店', 'active', datetime('now'), datetime('now'))")
+    conn.execute("INSERT INTO customers (id, tenant_id, display_name) VALUES (1, 1, '小红')")
+    conn.execute("INSERT INTO customers (id, tenant_id, display_name) VALUES (2, 2, '小明')")
+
+    # 租户1：两个标准化后重名的商品（' 面霜 ' 与 '面霜'）；租户2：同名带空格商品
+    cur = conn.execute("INSERT INTO products (tenant_id, canonical_name, lifecycle_status, knowledge_status, version, created_at, updated_at) VALUES (1, ' 面霜 ', 'draft', 'incomplete', 1, datetime('now'), datetime('now'))")
+    p1 = cur.lastrowid
+    cur = conn.execute("INSERT INTO products (tenant_id, canonical_name, lifecycle_status, knowledge_status, version, created_at, updated_at) VALUES (1, '面霜', 'draft', 'incomplete', 1, datetime('now'), datetime('now'))")
+    p2 = cur.lastrowid
+    cur = conn.execute("INSERT INTO products (tenant_id, canonical_name, lifecycle_status, knowledge_status, version, created_at, updated_at) VALUES (2, ' 面霜 ', 'draft', 'incomplete', 1, datetime('now'), datetime('now'))")
+    p3 = cur.lastrowid
+
+    # 账本：L1/L2 同租户重名，L3 跨租户，L4 空商品名（不应关联）
+    conn.execute("INSERT INTO ledger_entries (tenant_id, customer_id, entry_type, product_name, product_id, quantity) VALUES (1, 1, 'product_purchase', ' 面霜 ', ?, 1)", (p1,))
+    conn.execute("INSERT INTO ledger_entries (tenant_id, customer_id, entry_type, product_name, product_id, quantity) VALUES (1, 1, 'product_purchase', '面霜', ?, 1)", (p2,))
+    conn.execute("INSERT INTO ledger_entries (tenant_id, customer_id, entry_type, product_name, product_id, quantity) VALUES (2, 2, 'product_purchase', ' 面霜 ', ?, 1)", (p3,))
+    conn.execute("INSERT INTO ledger_entries (tenant_id, customer_id, entry_type, product_name, product_id, quantity) VALUES (1, 1, 'product_purchase', '   ', NULL, 1)")
+    conn.commit()
+    conn.close()
+
+    command.upgrade(cfg, "head")
+
+    conn = sqlite3.connect(str(db))
+    # canonical_name 已 TRIM
+    names = {r[0]: r[1] for r in conn.execute("SELECT id, canonical_name FROM products WHERE deleted_at IS NULL").fetchall()}
+    assert names[p1] == "面霜"
+    assert names[p3] == "面霜"
+    # 同租户重名合并：仅保留最小 id（p1），p2 被删除；跨租户 p3 保留
+    survivors = {r[0] for r in conn.execute("SELECT id FROM products WHERE deleted_at IS NULL").fetchall()}
+    assert p1 in survivors and p2 not in survivors and p3 in survivors
+
+    # product_name 原文保留，product_id 指向正确（trim 后合并到 p1，跨租户仍 p3，空名仍 NULL）
+    rows = conn.execute("SELECT product_name, product_id, tenant_id FROM ledger_entries ORDER BY id").fetchall()
+    assert rows[0] == (" 面霜 ", p1, 1), f"带空格记录原文保留且指向 p1：{rows[0]}"
+    assert rows[1] == ("面霜", p1, 1), f"无空格记录合并后指向 p1：{rows[1]}"
+    assert rows[2] == (" 面霜 ", p3, 2), f"跨租户记录仍指向 p3：{rows[2]}"
+    assert rows[3] == ("   ", None, 1), f"空商品名不关联：{rows[3]}"
+    conn.close()

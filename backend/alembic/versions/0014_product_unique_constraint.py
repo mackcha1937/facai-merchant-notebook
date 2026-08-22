@@ -20,13 +20,16 @@ def upgrade() -> None:
     bind.exec_driver_sql(
         "UPDATE products SET canonical_name = TRIM(canonical_name) WHERE canonical_name != TRIM(canonical_name)"
     )
-    # 2. 合并同 tenant 同名 Product（保留最小 id），并回填 product_id
+    # 2. 合并同 tenant 同名 Product（保留最小 id），并回填 product_id。
+    #    注意：canonical_name 已被 TRIM，比较时也必须对 product_name 做 TRIM，
+    #    否则 “ 面霜 ” 这类带首尾空格的历史记录会因等值比较失败而丢失 product_id。
     bind.exec_driver_sql(
         """
         UPDATE ledger_entries SET product_id = (
             SELECT MIN(p.id) FROM products p
             WHERE p.tenant_id = ledger_entries.tenant_id
-              AND p.canonical_name = ledger_entries.product_name
+              AND p.canonical_name = TRIM(ledger_entries.product_name)
+              AND TRIM(ledger_entries.product_name) != ''
               AND p.deleted_at IS NULL
         )
         WHERE product_id IS NOT NULL

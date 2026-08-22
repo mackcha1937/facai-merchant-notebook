@@ -31,6 +31,25 @@ SUBTABLE_BACKFILL = {
     "evaluation_case_results": ("run_id", "evaluation_runs"),
 }
 
+# 0009 upgrade 第 3 步新增的 V2 主要关系外键（downgrade 必须显式撤销）。
+# 注意：customer_aliases/packages/ledger_entries 的关系外键会在 V1 七表重建时随表一并移除，
+# 因此不在此列。
+RELATION_FKS = [
+    ("users", "fk_users_tenant"),
+    ("invites", "fk_invites_tenant"),
+    ("customer_facts", "fk_customer_facts_customer"),
+    ("recommendations", "fk_recommendations_customer"),
+    ("conversation_sessions", "fk_sessions_thread"),
+    ("messages", "fk_messages_session"),
+    ("message_blocks", "fk_blocks_message"),
+    ("entity_mentions", "fk_mentions_message"),
+    ("context_summaries", "fk_summaries_session"),
+    ("knowledge_documents", "fk_kd_tenant"),
+    ("embedding_records", "fk_er_tenant"),
+    ("embedding_records", "fk_er_document"),
+    ("evaluation_case_results", "fk_ecr_run"),
+]
+
 
 def upgrade() -> None:
     # 1. V1 七表 tenant_id NOT NULL + 外键 + 索引
@@ -117,6 +136,11 @@ def downgrade() -> None:
     op.drop_index("ix_ledger_tenant_customer", table_name="ledger_entries")
     op.drop_index("ix_customer_aliases_tenant_customer", table_name="customer_aliases")
 
+    # 撤销 0009 新增的 V2 主要关系外键（13 个）
+    for table, constraint in RELATION_FKS:
+        with op.batch_alter_table(table, recreate="always") as batch:
+            batch.drop_constraint(constraint, type_="foreignkey")
+
     # 移除 6 张子表 tenant_id 列
     for table in SUBTABLE_BACKFILL.keys():
         with op.batch_alter_table(table, recreate="always") as batch:
@@ -125,29 +149,28 @@ def downgrade() -> None:
     # V1 七表恢复到 0008 状态：tenant_id 可空、无 tenant 外键（手动重建）
     _rebuild_v1_table_nullable_tenant(bind, "customers", [
         "id INTEGER NOT NULL PRIMARY KEY",
-        "tenant_id INTEGER",
         "display_name VARCHAR(100) NOT NULL",
         "created_at DATETIME",
         "updated_at DATETIME",
         "deleted_at DATETIME",
-    ], ["id", "tenant_id", "display_name", "created_at", "updated_at", "deleted_at"])
+        "tenant_id INTEGER",
+    ], ["id", "display_name", "created_at", "updated_at", "deleted_at", "tenant_id"])
     _rebuild_v1_table_nullable_tenant(bind, "customer_aliases", [
         "id INTEGER NOT NULL PRIMARY KEY",
-        "tenant_id INTEGER",
         "customer_id INTEGER NOT NULL",
         "alias VARCHAR(100) NOT NULL",
         "deleted_at DATETIME",
-    ], ["id", "tenant_id", "customer_id", "alias", "deleted_at"])
+        "tenant_id INTEGER",
+    ], ["id", "customer_id", "alias", "deleted_at", "tenant_id"])
     _rebuild_v1_table_nullable_tenant(bind, "services", [
         "id INTEGER NOT NULL PRIMARY KEY",
-        "tenant_id INTEGER",
         "name VARCHAR(100) NOT NULL",
         "status VARCHAR(20) NOT NULL",
         "deleted_at DATETIME",
-    ], ["id", "tenant_id", "name", "status", "deleted_at"])
+        "tenant_id INTEGER",
+    ], ["id", "name", "status", "deleted_at", "tenant_id"])
     _rebuild_v1_table_nullable_tenant(bind, "packages", [
         "id INTEGER NOT NULL PRIMARY KEY",
-        "tenant_id INTEGER",
         "customer_id INTEGER NOT NULL",
         "service_id INTEGER NOT NULL",
         "total_count INTEGER NOT NULL",
@@ -156,10 +179,10 @@ def downgrade() -> None:
         "purchased_on VARCHAR(20)",
         "status VARCHAR(20) NOT NULL",
         "deleted_at DATETIME",
-    ], ["id", "tenant_id", "customer_id", "service_id", "total_count", "opening_used_count", "price_cents", "purchased_on", "status", "deleted_at"])
+        "tenant_id INTEGER",
+    ], ["id", "customer_id", "service_id", "total_count", "opening_used_count", "price_cents", "purchased_on", "status", "deleted_at", "tenant_id"])
     _rebuild_v1_table_nullable_tenant(bind, "ledger_entries", [
         "id INTEGER NOT NULL PRIMARY KEY",
-        "tenant_id INTEGER",
         "customer_id INTEGER NOT NULL",
         "entry_type VARCHAR(30) NOT NULL",
         "package_id INTEGER",
@@ -171,25 +194,26 @@ def downgrade() -> None:
         "original_input TEXT",
         "agent_prompt_version INTEGER",
         "deleted_at DATETIME",
-    ], ["id", "tenant_id", "customer_id", "entry_type", "package_id", "service_id", "product_name", "quantity", "price_cents", "occurred_on", "original_input", "agent_prompt_version", "deleted_at"])
+        "tenant_id INTEGER",
+    ], ["id", "customer_id", "entry_type", "package_id", "service_id", "product_name", "quantity", "price_cents", "occurred_on", "original_input", "agent_prompt_version", "deleted_at", "tenant_id"])
     _rebuild_v1_table_nullable_tenant(bind, "prompt_versions", [
         "id INTEGER NOT NULL PRIMARY KEY",
-        "tenant_id INTEGER",
         "version INTEGER NOT NULL",
         "content TEXT NOT NULL",
         "created_at DATETIME",
         "is_active BOOLEAN NOT NULL",
-    ], ["id", "tenant_id", "version", "content", "created_at", "is_active"])
+        "tenant_id INTEGER",
+    ], ["id", "version", "content", "created_at", "is_active", "tenant_id"])
     _rebuild_v1_table_nullable_tenant(bind, "agent_proposals", [
         "id INTEGER NOT NULL PRIMARY KEY",
-        "tenant_id INTEGER",
         "original_input TEXT NOT NULL",
         "parsed_json TEXT NOT NULL",
         "prompt_version INTEGER",
         "status VARCHAR(20) NOT NULL",
         "created_at DATETIME",
         "confirmed_at DATETIME",
-    ], ["id", "tenant_id", "original_input", "parsed_json", "prompt_version", "status", "created_at", "confirmed_at"])
+        "tenant_id INTEGER",
+    ], ["id", "original_input", "parsed_json", "prompt_version", "status", "created_at", "confirmed_at", "tenant_id"])
 
 
 def _rebuild_v1_table_nullable_tenant(bind, table, column_defs, columns):
