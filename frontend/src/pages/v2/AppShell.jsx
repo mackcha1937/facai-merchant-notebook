@@ -20,6 +20,7 @@ import {
 } from '../../fixtures/mock/index.js'
 
 const makeCtx = (viewType, extra = {}) => ({ ...createViewContext({ viewType }), ...extra })
+const requestKey = (prefix) => `${prefix}-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`}`
 
 export default function AppShell({ initialView = 'chat' }) {
   const stackRef = useRef(null)
@@ -46,6 +47,8 @@ export default function AppShell({ initialView = 'chat' }) {
   const [customers, setCustomers] = useState([])
   const [records, setRecords] = useState({})
   const [serviceDetails, setServiceDetails] = useState({})
+  const [products, setProducts] = useState([])
+  const [chatRefreshToken, setChatRefreshToken] = useState(0)
   const [dataError, setDataError] = useState('')
   const savedDraftRef = useRef('')
 
@@ -70,6 +73,10 @@ export default function AppShell({ initialView = 'chat' }) {
   }, [])
 
   useEffect(() => { refreshCustomers() }, [refreshCustomers])
+  const refreshProducts = useCallback(async () => {
+    try { setProducts(await api.getProducts()) } catch (error) { setDataError(error.message) }
+  }, [])
+  useEffect(() => { refreshProducts() }, [refreshProducts])
 
   const loadRecord = useCallback(async (customerId) => {
     try {
@@ -189,9 +196,28 @@ export default function AppShell({ initialView = 'chat' }) {
 
   const handleAuthoritativeWrite = useCallback(() => {
     refreshCustomers()
+    refreshProducts()
     const active = stackRef.current.current
     if (active?.customerId) loadRecord(active.customerId)
-  }, [loadRecord, refreshCustomers])
+  }, [loadRecord, refreshCustomers, refreshProducts])
+
+  const createProductProposal = useCallback(async (draft) => {
+    await api.createProductDraftProposal({
+      ...draft, category: null, aliases: [],
+      request_id: requestKey('product-create'), idempotency_key: requestKey('product-create-idem'),
+    })
+    setChatRefreshToken((value) => value + 1)
+    goChat()
+  }, [goChat])
+
+  const mergeProductProposal = useCallback(async (selection) => {
+    await api.createProductMergeProposal({
+      ...selection,
+      request_id: requestKey('product-merge'), idempotency_key: requestKey('product-merge-idem'),
+    })
+    setChatRefreshToken((value) => value + 1)
+    goChat()
+  }, [goChat])
 
   const handleCustomerIndexState = useCallback((patch) => {
     const cur = stackRef.current.current
@@ -258,7 +284,10 @@ export default function AppShell({ initialView = 'chat' }) {
       case VIEW_TYPES.MANAGEMENT:
         return <ManageView onBack={back} onOpenGroup={(g) => openManageGroup(g.id)} />
       case VIEW_TYPES.MANAGEMENT_DETAIL:
-        return <ManageDetailView group={mockManageGroups.find((g) => g.id === current.groupId)} onBack={back} />
+        return <ManageDetailView
+          group={mockManageGroups.find((g) => g.id === current.groupId)} onBack={back}
+          products={products} onCreateProduct={createProductProposal} onMergeProducts={mergeProductProposal}
+        />
       case VIEW_TYPES.CHAT:
       default:
         return null
@@ -290,6 +319,7 @@ export default function AppShell({ initialView = 'chat' }) {
             onDraftChange={setDraftInput}
             onPendingChange={mapPending}
             onAuthoritativeWrite={handleAuthoritativeWrite}
+            refreshToken={chatRefreshToken}
           />
         </main>
 

@@ -9,11 +9,12 @@ from sqlalchemy.orm import Session, selectinload
 from app.application import serializers
 from app.core.tenant import get_current_tenant_id
 from app.domain.errors import NotFoundError
-from app.infrastructure.models import LedgerEntry, Package
+from app.infrastructure.models import LedgerEntry, Package, Product
 from app.repositories import customers as customer_repo
 from app.repositories import ledger as ledger_repo
 from app.repositories import packages as package_repo
 from app.repositories import services as service_repo
+from app.repositories import customer_facts as fact_repo
 
 _CONSUME_TYPES = ("package_consumption", "one_time_service")
 
@@ -157,6 +158,31 @@ def get_customer_overview(db: Session, customer_id: int) -> dict:
     )
 
     last = _last_consumption(db, customer_id)
+    facts = fact_repo.list_current(db, customer_id)
+    product_rows = db.execute(
+        select(Product, LedgerEntry)
+        .join(LedgerEntry, LedgerEntry.product_id == Product.id)
+        .where(
+            Product.tenant_id == get_current_tenant_id(),
+            LedgerEntry.tenant_id == get_current_tenant_id(),
+            LedgerEntry.customer_id == customer_id,
+            LedgerEntry.entry_type == "product_purchase",
+            LedgerEntry.deleted_at.is_(None),
+        )
+        .order_by(LedgerEntry.occurred_on.desc(), LedgerEntry.id.desc())
+    ).all()
+    product_groups: dict[int, dict] = {}
+    for product, entry in product_rows:
+        item = product_groups.setdefault(product.id, {
+            "id": product.id, "name": product.canonical_name, "brand": product.brand,
+            "specification": product.specification,
+            "lifecycle_status": product.lifecycle_status,
+            "knowledge_status": product.knowledge_status,
+            "last_purchased_at": entry.occurred_on, "purchase_count": 0,
+            "quantity_total": 0,
+        })
+        item["purchase_count"] += 1
+        item["quantity_total"] += entry.quantity
     return {
         "id": customer.id,
         "display_name": customer.display_name,
@@ -166,6 +192,15 @@ def get_customer_overview(db: Session, customer_id: int) -> dict:
         "active_package_count": active_package_count,
         "services": services,
         "recent_entries": [serializers.ledger_to_dict(e) for e in recent],
+        "ledger_history": [serializers.ledger_to_dict(e) for e in recent],
+        "facts": [{
+            "id": fact.id, "type": fact.fact_type, "value": fact.display_value,
+            "normalized_value": fact.normalized_value, "evidence": fact.evidence_text,
+            "confidence": fact.confidence, "sensitivity_level": fact.sensitivity_level,
+            "confirmed": True, "valid_from": fact.valid_from.isoformat() if fact.valid_from else None,
+            "supersedes_id": fact.supersedes_id,
+        } for fact in facts],
+        "products": list(product_groups.values()),
     }
 
 

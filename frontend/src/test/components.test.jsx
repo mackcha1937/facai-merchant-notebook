@@ -100,8 +100,9 @@ describe('ProductMatchCard 状态', () => {
 
   it('not_found 显示识别信息并询问是否新增', () => {
     render(<ProductMatchCard match={mockProductMatches.not_found} onAddNew={() => {}} />)
-    expect(screen.getByText(/是否作为新产品新增/)).toBeInTheDocument()
-    expect(screen.getByText('新增（演示）')).toBeInTheDocument()
+    expect(screen.getByText(/是否作为新产品草稿新增/)).toBeInTheDocument()
+    expect(screen.getByText('作为新产品')).toBeInTheDocument()
+    expect(screen.getByText(/暂不参与跨客户推荐/)).toBeInTheDocument()
   })
 })
 

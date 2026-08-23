@@ -103,6 +103,7 @@ describe('权威历史卡与 ContextStack', () => {
     ]))
     window.localStorage.setItem('facai-v2-draft', '保留草稿')
     vi.spyOn(api, 'getCustomers').mockResolvedValue([])
+    vi.spyOn(api, 'getProducts').mockResolvedValue([])
     vi.spyOn(api, 'getChatHistory').mockResolvedValue({ messages: [], next_cursor: null, has_more: false })
     vi.spyOn(api, 'getPendingActions').mockResolvedValue({ items: [] })
     render(<AppShell initialView="chat" />)

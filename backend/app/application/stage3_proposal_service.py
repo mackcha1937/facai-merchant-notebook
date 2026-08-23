@@ -31,7 +31,7 @@ def _proposal(db: Session, proposal_id: int) -> AgentProposal:
 
 def _parsed(proposal: AgentProposal) -> dict:
     value = _load_json(proposal.parsed_json, {})
-    if not value.get("customer") or not value.get("actions"):
+    if not value.get("actions"):
         raise DomainError("确认卡缺少可执行操作")
     return value
 
@@ -135,6 +135,11 @@ def confirm(db: Session, proposal_id: int, data, now: datetime | None = None) ->
             "该确认卡已失效，请基于当前数据重新生成",
             _conflict_payload(proposal, proposal.status, conflict_type="proposal_not_pending"),
         )
+    if proposal.status == "resolving":
+        raise ConflictError(
+            "请先完成产品匹配，再进行最终确认",
+            _conflict_payload(proposal, "resolving", conflict_type="product_resolution_required"),
+        )
     if proposal.expires_at and proposal.expires_at <= current:
         _mark_expired(db, proposal, current)
         db.commit()
@@ -199,9 +204,12 @@ def confirm(db: Session, proposal_id: int, data, now: datetime | None = None) ->
     try:
         db.refresh(proposal)
         request = ConfirmRequest.model_validate(
-            {"customer": parsed["customer"], "actions": parsed["actions"]}
+            {"customer": parsed.get("customer"), "actions": parsed["actions"]}
         )
-        customer = confirmation_service._resolve_customer_confirm(db, request.customer)
+        customer = (
+            confirmation_service._resolve_customer_confirm(db, request.customer)
+            if request.customer is not None else None
+        )
         validations = [confirmation_service._validate_action(db, customer, action) for action in request.actions]
         failures = [item for item in validations if not item["ok"]]
         if failures:
@@ -216,7 +224,9 @@ def confirm(db: Session, proposal_id: int, data, now: datetime | None = None) ->
         response = {
             "id": proposal.id,
             "status": "confirmed",
-            "customer": {"id": customer.id, "display_name": customer.display_name},
+            "customer": (
+                {"id": customer.id, "display_name": customer.display_name} if customer else None
+            ),
             "results": results,
             "idempotent_replay": False,
         }
@@ -295,10 +305,14 @@ def edit(db: Session, proposal_id: int, data, now: datetime | None = None) -> di
             parsed["actions"][index]["quantity"] = quantity
         except (ValueError, IndexError) as exc:
             raise DomainError("修改数量无效") from exc
-    parsed["changes_summary"] = "；".join(
-        f"{action.get('service_name', action['type'])} {action.get('quantity', 1)} 次"
-        for action in parsed["actions"]
-    )
+    indexes = sorted(set(data.remove_action_indexes), reverse=True)
+    for index in indexes:
+        if index < 0 or index >= len(parsed["actions"]):
+            raise DomainError("要移除的候选项不存在")
+        parsed["actions"].pop(index)
+    if not parsed["actions"]:
+        raise DomainError("确认卡至少需要保留一项操作")
+    parsed["changes_summary"] = "；".join(_action_summary(action) for action in parsed["actions"])
     proposal.parsed_json = json.dumps(parsed, ensure_ascii=False)
     proposal.data_version += 1
     proposal.updated_at = current
@@ -306,6 +320,21 @@ def edit(db: Session, proposal_id: int, data, now: datetime | None = None) -> di
     _set_block_state(db, proposal, "pending")
     db.commit()
     return {"status": "pending", "proposal": proposal_dict(proposal)}
+
+
+def _action_summary(action: dict) -> str:
+    action_type = action.get("type")
+    if action_type == "upsert_customer_fact":
+        return f"客户事实：{action.get('display_value', '未填写')}"
+    if action_type == "delete_customer_fact":
+        return f"撤销客户事实：{action.get('display_value', '未填写')}"
+    if action_type == "record_product_purchase":
+        return f"购买{action.get('canonical_name') or action.get('product_name', '产品')} {action.get('quantity', 1)}件"
+    if action_type == "create_product":
+        return f"新增产品草稿：{action.get('canonical_name', '未填写')}"
+    if action_type == "merge_product":
+        return "合并重复产品"
+    return f"{action.get('service_name', action_type)} {action.get('quantity', 1)} 次"
 
 
 def regenerate(db: Session, proposal_id: int, data, now: datetime | None = None) -> dict:

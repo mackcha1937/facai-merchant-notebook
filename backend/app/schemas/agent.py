@@ -25,6 +25,23 @@ class ConfirmAction(BaseModel):
     service_id: int | None = None
     package_id: int | None = None
     product_name: str | None = None
+    product_id: int | None = None
+    create_product: bool = False
+    canonical_name: str | None = None
+    brand: str | None = None
+    category: str | None = None
+    specification: str | None = None
+    aliases: list[str] = Field(default_factory=list)
+    source_product_id: int | None = None
+    target_product_id: int | None = None
+    fact_type: str | None = None
+    display_value: str | None = None
+    normalized_value: str | None = None
+    evidence_text: str | None = None
+    confidence: float | None = None
+    sensitivity_level: str | None = None
+    supersedes_id: int | None = None
+    fact_id: int | None = None
     quantity: int | None = None
     price_cents: int | None = None
     total_count: int | None = None
@@ -33,7 +50,7 @@ class ConfirmAction(BaseModel):
 
 
 class ConfirmRequest(BaseModel):
-    customer: ConfirmCustomer
+    customer: ConfirmCustomer | None = None
     actions: list[ConfirmAction] = Field(default_factory=list)
 
 

@@ -75,7 +75,7 @@ export default function CustomerRecordCard({ record, onBackToList, onOpenService
               <span className="v">{f.value}</span>
             </div>
           ))}
-          {facts.length === 0 && <div className="v2-state">阶段3不创建客户事实</div>}
+          {facts.length === 0 && <div className="v2-state">暂无已确认客户事实</div>}
         </div>
       )}
 
@@ -102,7 +102,7 @@ export default function CustomerRecordCard({ record, onBackToList, onOpenService
               <span className="v">最近 {p.last_purchased_at} · 共{p.purchase_count}次</span>
             </div>
           ))}
-          {products.length === 0 && <div className="v2-state">阶段3不新增产品识别</div>}
+          {products.length === 0 && <div className="v2-state">暂无产品购买记录</div>}
         </div>
       )}
 

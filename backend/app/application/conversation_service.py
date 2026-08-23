@@ -22,8 +22,11 @@ from app.infrastructure.models import (
 )
 from app.repositories import conversations as conversation_repo
 from app.repositories import customers as customer_repo
+from app.repositories import customer_facts as fact_repo
 from app.repositories import proposals as proposal_repo
 from app.repositories import services as service_repo
+from app.application.fact_extraction_service import extract_fact_candidates
+from app.application.product_resolution_service import extract_product_purchase, resolve_product
 
 
 def _utc_naive(value: datetime | None = None) -> datetime:
@@ -133,6 +136,10 @@ def proposal_dict(proposal: AgentProposal) -> dict:
         "precheck": parsed.get("precheck", "已读取当前权威数据"),
         "actions": parsed.get("actions", []),
         "customer": parsed.get("customer"),
+        "product_match": parsed.get("product_match"),
+        "resolution_required": parsed.get("resolution_required", False),
+        "resolution_idempotency_key": parsed.get("resolution_idempotency_key"),
+        "fact_extraction_source": parsed.get("fact_extraction_source"),
         "result": _load_json(proposal.result_json, None),
     }
 
@@ -204,7 +211,8 @@ def _quantity_after(text: str, name: str) -> int:
 def _controlled_parse(db: Session, text: str, now: datetime | None = None) -> tuple[dict | None, list[dict]]:
     customer, surface = _resolve_customer(db, text)
     if customer is None:
-        return None, []
+        product_management = _parse_product_management(db, text)
+        return (product_management, []) if product_management else (None, [])
     actions = []
     mentions = [{"entity_type": "customer", "entity_id": customer.id, "surface_text": surface}]
     for service in service_repo.list_services(db):
@@ -220,21 +228,121 @@ def _controlled_parse(db: Session, text: str, now: datetime | None = None) -> tu
             }
         )
         mentions.append({"entity_type": "service", "entity_id": service.id, "surface_text": service.name})
-    if not actions:
+
+    adapter = None
+    from app.core.config import get_settings
+
+    if get_settings().is_model_configured:
+        from app.infrastructure.llm.deepseek import DeepSeekAdapter
+
+        adapter = DeepSeekAdapter()
+    facts, fact_source = extract_fact_candidates(db, customer.id, text, adapter=adapter)
+    for fact in facts:
+        actions.append({"type": "upsert_customer_fact", **fact})
+
+    delete_match = re.search(r"(?:把)?[^，。；;]{0,12}?([^，。；;]{1,12}?)(?:标签|事实)?(?:删掉|删除|移除)", text)
+    if delete_match:
+        keyword = delete_match.group(1).replace(customer.display_name, "").replace(surface or "", "").strip("的 ")
+        for fact in fact_repo.list_current(db, customer.id):
+            if (
+                fact.display_value in keyword or keyword in fact.display_value
+                or ("敏感" in keyword and fact.fact_type in {"skin_sensitivity", "skin_condition"})
+            ):
+                actions.append({
+                    "type": "delete_customer_fact", "fact_id": fact.id,
+                    "fact_type": fact.fact_type, "display_value": fact.display_value,
+                    "evidence_text": text,
+                })
+
+    purchase = extract_product_purchase(text)
+    product_match = None
+    if purchase:
+        product_match = resolve_product(db, purchase["query"])
+        if product_match["status"] == "exact":
+            product = product_match["matched"]
+            actions.append({
+                "type": "record_product_purchase",
+                "product_id": product["id"],
+                "product_name": product["canonical_name"],
+                "quantity": purchase["quantity"],
+            })
+            mentions.append({
+                "entity_type": "product", "entity_id": product["id"],
+                "surface_text": purchase["query"],
+            })
+
+    if not actions and not purchase:
         return None, mentions
     resolved = resolve_relative_date(text, now.astimezone(shanghai_now().tzinfo) if now and now.tzinfo else now)
     for action in actions:
-        action["occurred_on"] = resolved["date"]
-    changes = "；".join(f"{a['service_name']} {a['quantity']} 次" for a in actions)
+        if action["type"] in {"consume_service", "record_one_time_service", "record_product_purchase"}:
+            action["occurred_on"] = resolved["date"]
+    changes = "；".join(_stage4_action_summary(a) for a in actions)
+    resolution_required = bool(purchase and product_match and product_match["status"] != "exact")
+    if resolution_required:
+        changes = "；".join(filter(None, [changes, f"待确认产品：{purchase['query']}"]))
     parsed = {
-        "title": f"确认{customer.display_name}的本次记账",
+        "title": f"确认{customer.display_name}的客户事实和业务记录",
         "changes_summary": changes,
-        "precheck": "确认时将重新检查客户、服务、套餐余额与数据版本",
+        "precheck": "确认时将重新检查客户、事实版本、产品状态、套餐余额与数据版本",
         "customer": {"customer_id": customer.id, "display_name": customer.display_name},
         "actions": actions,
         "resolved_absolute_dates": {"occurred_on": resolved},
+        "product_match": product_match,
+        "product_purchase": purchase,
+        "resolution_required": resolution_required,
+        "fact_extraction_source": fact_source,
     }
     return parsed, mentions
+
+
+def _parse_product_management(db: Session, text: str) -> dict | None:
+    create = re.search(r"(?:新增|添加|创建)(?:一个)?产品[：:]?\s*([^，。；;]+)", text)
+    if create:
+        name = create.group(1).strip()
+        if not name:
+            return None
+        return {
+            "title": "确认新增产品草稿",
+            "changes_summary": f"新增产品草稿：{name}（资料待补充）",
+            "precheck": "确认时重新检查重复产品；不会创建知识或 RAG 索引",
+            "customer": None,
+            "actions": [{"type": "create_product", "canonical_name": name, "aliases": []}],
+            "resolved_absolute_dates": {},
+            "resolution_required": False,
+        }
+    merge = re.search(r"把\s*([^，。；;]+?)\s*合并到\s*([^，。；;]+)", text)
+    if merge:
+        source_match = resolve_product(db, merge.group(1).strip())
+        target_match = resolve_product(db, merge.group(2).strip())
+        if source_match["status"] != "exact" or target_match["status"] != "exact":
+            raise DomainError("产品合并需要两个可精确匹配的产品名称")
+        source = source_match["matched"]
+        target = target_match["matched"]
+        return {
+            "title": "确认合并重复产品",
+            "changes_summary": f"合并产品：{source['name']} → {target['name']}",
+            "precheck": "确认时重新检查产品版本与关联账本",
+            "customer": None,
+            "actions": [{
+                "type": "merge_product", "source_product_id": source["id"],
+                "target_product_id": target["id"],
+            }],
+            "resolved_absolute_dates": {},
+            "resolution_required": False,
+        }
+    return None
+
+
+def _stage4_action_summary(action: dict) -> str:
+    if action["type"] == "upsert_customer_fact":
+        prefix = "敏感事实" if action.get("sensitivity_level") == "sensitive" else "客户事实"
+        return f"{prefix}：{action.get('display_value')}"
+    if action["type"] == "delete_customer_fact":
+        return f"撤销客户事实：{action.get('display_value')}"
+    if action["type"] == "record_product_purchase":
+        return f"购买{action.get('product_name')} {action.get('quantity', 1)}件"
+    return f"{action.get('service_name', action['type'])} {action.get('quantity', 1)} 次"
 
 
 def _save_mentions(db: Session, message_id: int, mentions: list[dict]) -> None:
@@ -269,8 +377,21 @@ def chat_turn(db: Session, data, now: datetime | None = None) -> dict:
         duplicate = proposal_repo.get_by_request_id(db, data.request_id)
     if duplicate is not None:
         return {"status": duplicate.status, "idempotent_replay": True, "proposal": proposal_dict(duplicate)}
+    confirmed = proposal_repo.get_by_confirmation_idempotency_key(db, data.idempotency_key)
+    if confirmed is not None:
+        return {
+            "status": "confirmed", "idempotent_replay": True,
+            "proposal": proposal_dict(confirmed),
+            "result": _load_json(confirmed.result_json, {}),
+        }
+    if conversation_repo.get_message_by_request(db, f"cancel-{data.idempotency_key}"[:64]) is not None:
+        return {"status": "cancelled", "idempotent_replay": True, "proposal": None}
     if conversation_repo.get_message_by_request(db, data.request_id) is not None:
         return {"status": "needs_clarification", "idempotent_replay": True, "proposal": None}
+
+    voice_command = _handle_pending_voice_command(db, data, now)
+    if voice_command is not None:
+        return voice_command
 
     thread = get_or_create_thread(db)
     session = get_or_create_session(db, thread, now)
@@ -299,8 +420,9 @@ def chat_turn(db: Session, data, now: datetime | None = None) -> dict:
 
     authority = build_authority_snapshot(db, parsed)
     expires_at = created_at + timedelta(hours=24)
+    proposal_status = "resolving" if parsed.get("resolution_required") else "pending"
     proposal = proposal_repo.create_proposal(
-        db, text, json.dumps(parsed, ensure_ascii=False), None, "pending",
+        db, text, json.dumps(parsed, ensure_ascii=False), None, proposal_status,
         owner_id=get_current_owner_id(), thread_id=thread.id, request_id=data.request_id,
         idempotency_key=data.idempotency_key, expires_at=expires_at,
         resolved_absolute_dates=json.dumps(parsed["resolved_absolute_dates"], ensure_ascii=False),
@@ -314,14 +436,18 @@ def chat_turn(db: Session, data, now: datetime | None = None) -> dict:
     db.flush()
     assistant = Message(
         tenant_id=get_current_tenant_id(), session_id=session.id, role="assistant",
-        content="已整理为一张统一确认卡，确认前不会写入账本。", message_type="block", created_at=created_at,
+        content=("请先确认产品身份；确认后会与其他候选合并为一张最终确认卡。"
+                 if parsed.get("resolution_required") else
+                 "已整理为一张统一确认卡，确认前不会写入账本。"),
+        message_type="block", created_at=created_at,
     )
     db.add(assistant)
     db.flush()
     card = proposal_dict(proposal)
     db.add(MessageBlock(
-        tenant_id=get_current_tenant_id(), message_id=assistant.id, block_type="confirm_card",
-        payload_json=json.dumps(card, ensure_ascii=False), state="pending", data_version=1,
+        tenant_id=get_current_tenant_id(), message_id=assistant.id,
+        block_type="product_match_card" if parsed.get("resolution_required") else "confirm_card",
+        payload_json=json.dumps(card, ensure_ascii=False), state=proposal_status, data_version=1,
         proposal_id=proposal.id, created_at=created_at,
     ))
     _save_mentions(db, assistant.id, mentions)
@@ -335,7 +461,103 @@ def chat_turn(db: Session, data, now: datetime | None = None) -> dict:
         if duplicate is None:
             raise
         return {"status": duplicate.status, "idempotent_replay": True, "proposal": proposal_dict(duplicate)}
-    return {"status": "pending", "idempotent_replay": False, "proposal": proposal_dict(proposal)}
+    return {
+        "status": proposal_status, "idempotent_replay": False,
+        "proposal": proposal_dict(proposal), "product_match": parsed.get("product_match"),
+    }
+
+
+def _handle_pending_voice_command(db: Session, data, now: datetime | None = None) -> dict | None:
+    """转写文本与手动按钮共用同一 Proposal 服务，不另开语音写接口。"""
+    text = data.text.strip()
+    if not re.search(r"^(确认|取消|选择?第?[一二三123]个|作为新产品|新增这个产品|去掉.+)$", text):
+        return None
+    items = pending_actions(db, now=now)["items"]
+    matching_resolution = next(
+        (
+            item["proposal"] for item in items
+            if item["proposal"].get("resolution_idempotency_key") == data.idempotency_key
+        ),
+        None,
+    )
+    if matching_resolution is not None:
+        return {
+            "status": matching_resolution["status"], "idempotent_replay": True,
+            "proposal": matching_resolution,
+        }
+    current = next(
+        (item["proposal"] for item in items if item["proposal"]["status"] in {"resolving", "pending"}),
+        None,
+    )
+    if current is None:
+        return None
+
+    if current["status"] == "resolving":
+        from app.application import stage4_entity_service
+        from app.schemas.conversation import ProductResolutionChoiceRequest
+
+        match = current.get("product_match") or {}
+        if text in {"作为新产品", "新增这个产品"}:
+            recognized = match.get("recognized") or {}
+            request = ProductResolutionChoiceRequest(
+                data_version=current["data_version"], idempotency_key=data.idempotency_key,
+                create_new=True, canonical_name=recognized.get("name"),
+                brand=recognized.get("brand"), specification=recognized.get("specification"),
+            )
+        else:
+            mapping = {"一": 0, "1": 0, "二": 1, "2": 1, "三": 2, "3": 2}
+            token = re.search(r"[一二三123]", text)
+            index = mapping.get(token.group(0), 0) if token else 0
+            candidates = match.get("candidates") or []
+            if index >= len(candidates):
+                raise DomainError("产品候选没有这一项，请重新选择")
+            request = ProductResolutionChoiceRequest(
+                data_version=current["data_version"], idempotency_key=data.idempotency_key,
+                product_id=candidates[index]["id"],
+            )
+        return stage4_entity_service.resolve_proposal_product(db, current["id"], request)
+
+    from app.application import stage3_proposal_service
+    if text == "确认":
+        from app.schemas.conversation import ProposalConfirmRequest
+
+        result = stage3_proposal_service.confirm(
+            db, current["id"], ProposalConfirmRequest(
+                idempotency_key=data.idempotency_key, device_id=data.device_id,
+                data_version=current["data_version"],
+            ), now=now,
+        )
+        return {"status": "confirmed", "proposal": current, "result": result}
+    if text == "取消":
+        from app.schemas.conversation import ProposalCancelRequest
+
+        result = stage3_proposal_service.cancel(
+            db, current["id"], ProposalCancelRequest(
+                idempotency_key=data.idempotency_key, device_id=data.device_id,
+            ), now=now,
+        )
+        return {"status": "cancelled", "proposal": current, "result": result}
+    if text.startswith("去掉"):
+        keyword = text[2:].strip()
+        indexes = [
+            index for index, action in enumerate(current.get("actions") or [])
+            if action.get("type") == "upsert_customer_fact" and (
+                action.get("display_value", "") in keyword
+                or keyword in action.get("display_value", "")
+                or ("敏感" in keyword and action.get("sensitivity_level") == "sensitive")
+            )
+        ]
+        if not indexes:
+            raise DomainError("没有找到要移除的客户事实候选")
+        from app.schemas.conversation import ProposalEditRequest
+
+        return stage3_proposal_service.edit(
+            db, current["id"], ProposalEditRequest(
+                idempotency_key=data.idempotency_key, data_version=current["data_version"],
+                remove_action_indexes=indexes,
+            ), now=now,
+        )
+    return None
 
 
 def pending_actions(db: Session, now: datetime | None = None) -> dict:
@@ -350,7 +572,7 @@ def pending_actions(db: Session, now: datetime | None = None) -> dict:
             pending.status = "expired"
             pending.updated_at = current
             pending.resolved_at = current
-            if proposal and proposal.status == "pending":
+            if proposal and proposal.status in {"pending", "resolving"}:
                 proposal.status = "expired"
                 proposal.updated_at = current
             changed = True

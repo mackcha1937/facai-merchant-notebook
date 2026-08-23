@@ -17,6 +17,10 @@ from app.domain.rules import (
     validate_package_counts,
 )
 from app.infrastructure.models import Customer
+from app.application.fact_extraction_service import ALLOWED_FACT_TYPES, normalize_fact_value
+from app.application.product_resolution_service import normalize_product_text, resolve_product
+from app.repositories import customer_facts as fact_repo
+from app.repositories import products as product_repo
 from app.repositories import customers as customer_repo
 from app.repositories import ledger as ledger_repo
 from app.repositories import packages as package_repo
@@ -39,6 +43,8 @@ def _get_pending_proposal(db: Session, proposal_id: int):
 
 
 def _resolve_customer_confirm(db: Session, customer_data) -> Customer:
+    if customer_data is None:
+        raise DomainError("该操作需要选择客户")
     if customer_data.customer_id is not None:
         customer = customer_repo.get_customer(db, customer_data.customer_id)
         if customer is None:
@@ -220,13 +226,91 @@ def _validate_action(db: Session, customer: Customer, action) -> dict:
         return _ok("record_one_time_service", {"quantity": quantity})
 
     if action_type == "record_product_purchase":
-        if not action.product_name or not str(action.product_name).strip():
+        if customer is None:
+            return _fail("record_product_purchase", "商品购买需要选择客户")
+        if action.product_id is not None:
+            product = product_repo.get_product(db, action.product_id)
+            if product is None:
+                return _fail("record_product_purchase", "选择的产品不存在、已停用或已合并")
+        elif not action.create_product and not (action.product_name and action.product_name.strip()):
+            return _fail("record_product_purchase", "商品购买需要选择已有产品或确认新增产品")
+        if action.create_product and not (action.canonical_name or action.product_name):
             return _fail("record_product_purchase", "商品购买需要填写商品名称")
+        if action.create_product:
+            matched = resolve_product(
+                db, action.canonical_name or action.product_name,
+                brand=action.brand, specification=action.specification,
+            )
+            if matched["status"] == "exact":
+                return _fail("record_product_purchase", "确认期间已出现相同产品，请重新选择现有产品")
         try:
             quantity = ensure_positive_int(action.quantity or 1, "数量")
         except DomainError as exc:
             return _fail("record_product_purchase", str(exc))
-        return _ok("record_product_purchase", {"quantity": quantity, "product_name": str(action.product_name).strip()})
+        return _ok("record_product_purchase", {
+            "quantity": quantity,
+            "product_id": action.product_id,
+            "product_name": str(action.canonical_name or action.product_name or product.canonical_name).strip(),
+            "creates_draft": bool(action.create_product),
+        })
+
+    if action_type == "upsert_customer_fact":
+        if customer is None:
+            return _fail(action_type, "客户事实需要选择客户")
+        if action.fact_type not in ALLOWED_FACT_TYPES:
+            return _fail(action_type, "客户事实类型不在白名单内")
+        if not action.display_value or not action.evidence_text:
+            return _fail(action_type, "客户事实必须保留展示值和原话证据")
+        if action.sensitivity_level not in {"normal", "sensitive"}:
+            return _fail(action_type, "客户事实敏感级别无效")
+        current = fact_repo.get_current_by_type(db, customer.id, action.fact_type)
+        if current and current.normalized_value != normalize_fact_value(action.display_value):
+            if action.supersedes_id != current.id:
+                return _fail(action_type, "客户事实版本已变化，请重新确认")
+        return _ok(action_type, {
+            "fact_type": action.fact_type,
+            "display_value": action.display_value,
+            "sensitive": action.sensitivity_level == "sensitive",
+            "supersedes_id": current.id if current else None,
+        })
+
+    if action_type == "delete_customer_fact":
+        if customer is None or action.fact_id is None:
+            return _fail(action_type, "删除客户事实需要客户和事实ID")
+        current = fact_repo.get_current_by_type(db, customer.id, action.fact_type)
+        if current is None or current.id != action.fact_id:
+            return _fail(action_type, "要删除的客户事实已变化，请重新确认")
+        if not action.evidence_text:
+            return _fail(action_type, "删除客户事实必须保留店主原话证据")
+        return _ok(action_type, {
+            "fact_id": current.id, "fact_type": current.fact_type,
+            "display_value": current.display_value,
+        })
+
+    if action_type == "create_product":
+        name = str(action.canonical_name or "").strip()
+        if not name:
+            return _fail(action_type, "新增产品需要标准名称")
+        matched = resolve_product(
+            db, name, brand=action.brand, specification=action.specification
+        )
+        if matched["status"] == "exact":
+            return _fail(action_type, "已存在相同产品，请选择现有产品或先处理重复项")
+        return _ok(action_type, {"canonical_name": name, "knowledge_status": "incomplete"})
+
+    if action_type == "merge_product":
+        if not action.source_product_id or not action.target_product_id:
+            return _fail(action_type, "合并产品需要来源和保留产品")
+        if action.source_product_id == action.target_product_id:
+            return _fail(action_type, "不能把产品合并到自身")
+        if not product_repo.get_product(db, action.source_product_id):
+            return _fail(action_type, "来源产品不存在、已停用或已合并")
+        if not product_repo.get_product(db, action.target_product_id):
+            return _fail(action_type, "保留产品不存在、已停用或已合并")
+        return _ok(action_type, {
+            "source_product_id": action.source_product_id,
+            "target_product_id": action.target_product_id,
+        })
 
     if action_type == "query_customer":
         return _ok("query_customer", None)
@@ -254,6 +338,14 @@ def _execute_action(db: Session, customer: Customer, action, proposal) -> dict:
         return _do_one_time_service(db, customer, action, proposal, occurred_on)
     if action_type == "record_product_purchase":
         return _do_product_purchase(db, customer, action, proposal, occurred_on)
+    if action_type == "upsert_customer_fact":
+        return _do_customer_fact(db, customer, action, proposal)
+    if action_type == "delete_customer_fact":
+        return _do_delete_customer_fact(db, customer, action, proposal)
+    if action_type == "create_product":
+        return _do_create_product(db, action)
+    if action_type == "merge_product":
+        return _do_merge_product(db, action)
     if action_type == "query_customer":
         return _do_query_customer(db, customer)
     raise DomainError(f"不支持的操作类型：{action_type}")
@@ -339,7 +431,32 @@ def _do_one_time_service(db: Session, customer: Customer, action, proposal, occu
 
 
 def _do_product_purchase(db: Session, customer: Customer, action, proposal, occurred_on: str) -> dict:
-    product_name = str(action.product_name).strip()
+    product = product_repo.get_product(db, action.product_id) if action.product_id else None
+    if action.create_product:
+        product = product_repo.create_product(
+            db,
+            canonical_name=str(action.canonical_name or action.product_name).strip(),
+            brand=action.brand,
+            category=action.category,
+            specification=action.specification,
+        )
+        for alias in action.aliases:
+            normalized = normalize_product_text(alias)
+            if normalized:
+                product_repo.add_alias(db, product, alias, normalized, source="owner_confirmed")
+    elif product is None and action.product_name:
+        # V1 确认接口本身已经是人工最终确认。升级后将历史自由文本在同一事务中
+        # 解析为现有产品或创建 draft/incomplete，而不是破坏旧记账闭环。
+        matched = resolve_product(db, action.product_name)
+        if matched["status"] == "exact":
+            product = product_repo.get_product(db, matched["matched"]["id"])
+        elif matched["status"] == "not_found":
+            product = product_repo.create_product(db, canonical_name=action.product_name)
+        else:
+            raise DomainError("商品名称匹配到多个近似产品，请先选择具体产品")
+    if product is None:
+        raise DomainError("产品不存在或已停用")
+    product_name = product.canonical_name
     quantity = ensure_positive_int(action.quantity or 1, "数量")
     ledger_repo.create_ledger_entry(
         db,
@@ -353,12 +470,88 @@ def _do_product_purchase(db: Session, customer: Customer, action, proposal, occu
         occurred_on=occurred_on,
         original_input=proposal.original_input,
         agent_prompt_version=proposal.prompt_version,
+        product_id=product.id,
     )
     return {
         "type": "record_product_purchase",
         "message": f"已记录购买 {product_name} 共 {quantity} 件。",
         "occurred_on": occurred_on,
         "product_name": product_name,
+        "product_id": product.id,
+        "product_lifecycle_status": product.lifecycle_status,
+        "knowledge_status": product.knowledge_status,
+    }
+
+
+def _do_customer_fact(db: Session, customer: Customer, action, proposal) -> dict:
+    fact = fact_repo.create_confirmed(
+        db,
+        customer_id=customer.id,
+        fact_type=action.fact_type,
+        display_value=action.display_value.strip(),
+        normalized_value=normalize_fact_value(action.display_value),
+        evidence_text=action.evidence_text.strip(),
+        source_type="conversation",
+        source_id=str(proposal.id),
+        confidence=action.confidence,
+        sensitivity_level=action.sensitivity_level,
+        supersedes_id=action.supersedes_id,
+    )
+    return {
+        "type": "upsert_customer_fact",
+        "message": f"已确认客户事实：{fact.display_value}。",
+        "fact_id": fact.id,
+        "fact_type": fact.fact_type,
+        "supersedes_id": fact.supersedes_id,
+    }
+
+
+def _do_delete_customer_fact(db: Session, customer: Customer, action, proposal) -> dict:
+    previous, retraction = fact_repo.retract_current(
+        db, customer_id=customer.id, fact_id=action.fact_id,
+        evidence_text=action.evidence_text.strip(), source_id=str(proposal.id),
+    )
+    return {
+        "type": "delete_customer_fact",
+        "message": f"已撤销客户事实：{previous.display_value}。",
+        "fact_id": previous.id,
+        "retraction_id": retraction.id,
+    }
+
+
+def _do_create_product(db: Session, action) -> dict:
+    product = product_repo.create_product(
+        db, canonical_name=action.canonical_name, brand=action.brand,
+        category=action.category, specification=action.specification,
+    )
+    for alias in action.aliases:
+        normalized = normalize_product_text(alias)
+        if normalized:
+            product_repo.add_alias(db, product, alias, normalized, source="owner_confirmed")
+    return {
+        "type": "create_product",
+        "message": f"已新增产品草稿「{product.canonical_name}」，资料待补充。",
+        "product_id": product.id,
+        "lifecycle_status": product.lifecycle_status,
+        "knowledge_status": product.knowledge_status,
+    }
+
+
+def _do_merge_product(db: Session, action) -> dict:
+    source, target, moved = product_repo.merge_products(
+        db, action.source_product_id, action.target_product_id
+    )
+    source_alias = normalize_product_text(source.canonical_name)
+    if source_alias:
+        product_repo.add_alias(
+            db, target, source.canonical_name, source_alias, source="product_merge"
+        )
+    return {
+        "type": "merge_product",
+        "message": f"已将「{source.canonical_name}」合并到「{target.canonical_name}」。",
+        "source_product_id": source.id,
+        "target_product_id": target.id,
+        "moved_ledger_count": moved,
     }
 
 

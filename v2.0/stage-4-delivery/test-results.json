@@ -1,0 +1,15 @@
+{
+  "status": "通过",
+  "backend": "182 项通过（含阶段1—阶段4回归）",
+  "frontend": "38 项通过（7 个测试文件）",
+  "build": "Vite 生产构建通过（75 modules transformed）",
+  "sensitive_scan": "通过；应用源码、前端产物与 V2 文档无真实 key 命中",
+  "migration_cycle": "0016 → 0017 → 0016 → 0017，通过且 integrity_check=ok",
+  "data_integrity": {
+    "before": "客户4 / 套餐3 / 账本4（有效3）/ 事实0 / 产品1 / 别名0 / 剩余10",
+    "after": "客户4 / 套餐3 / 账本4（有效3）/ 事实0 / 产品1 / 别名0 / 剩余10"
+  },
+  "browser": "Chromium 实测：1470×771 桌面、390×844 手机；阶段4验证页、真实产品匹配、产品管理、客户读模型和手机对话通过",
+  "external_model": "未调用外部收费模型 API",
+  "rag": "未建设"
+}

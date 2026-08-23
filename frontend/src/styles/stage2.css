@@ -222,6 +222,28 @@
   border-bottom-left-radius: 5px;
 }
 
+.v2-fact-candidate {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fafafa;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.v2-fact-candidate[data-sensitive="true"] {
+  border-color: #f1c8a8;
+  background: #fff8f1;
+}
+
+.v2-edit-inline select {
+  min-height: 42px;
+  border: 1px solid #d9dde3;
+  border-radius: 8px;
+  background: #fff;
+}
+
 .v2-msg-block {
   margin-top: 12px;
 }

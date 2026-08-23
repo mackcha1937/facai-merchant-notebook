@@ -47,6 +47,17 @@ def get_by_idempotency_key(db: Session, idempotency_key: str) -> AgentProposal |
     )
 
 
+def get_by_confirmation_idempotency_key(
+    db: Session, idempotency_key: str
+) -> AgentProposal | None:
+    return db.scalar(
+        select(AgentProposal).where(
+            AgentProposal.tenant_id == get_current_tenant_id(),
+            AgentProposal.confirmation_idempotency_key == idempotency_key,
+        )
+    )
+
+
 def get_by_request_id(db: Session, request_id: str) -> AgentProposal | None:
     return db.scalar(
         select(AgentProposal).where(

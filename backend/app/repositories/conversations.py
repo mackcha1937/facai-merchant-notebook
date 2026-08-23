@@ -92,7 +92,6 @@ def get_block_for_proposal(db: Session, proposal_id: int) -> MessageBlock | None
         select(MessageBlock).where(
             MessageBlock.tenant_id == get_current_tenant_id(),
             MessageBlock.proposal_id == proposal_id,
-            MessageBlock.block_type == "confirm_card",
         ).order_by(MessageBlock.id.desc())
     )
 

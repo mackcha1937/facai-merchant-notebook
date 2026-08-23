@@ -221,6 +221,8 @@ class Product(Base):
     specification: Mapped[str | None] = mapped_column(String(100), nullable=True)
     lifecycle_status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False)
     knowledge_status: Mapped[str] = mapped_column(String(30), default="incomplete", nullable=False)
+    owner_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    merged_into_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)

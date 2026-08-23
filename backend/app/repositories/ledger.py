@@ -77,6 +77,7 @@ def create_ledger_entry(
     package_id: int | None = None,
     original_input: str | None = None,
     agent_prompt_version: int | None = None,
+    product_id: int | None = None,
 ) -> LedgerEntry:
     entry = LedgerEntry(
         tenant_id=get_current_tenant_id(),
@@ -84,6 +85,7 @@ def create_ledger_entry(
         entry_type=entry_type,
         package_id=package_id,
         service_id=service_id,
+        product_id=product_id,
         product_name=product_name,
         quantity=quantity,
         price_cents=price_cents,

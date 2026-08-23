@@ -1,4 +1,5 @@
 // 管理与设置详情（第二级）。AI运行状态为只读：无输入框、开关、保存按钮、API Key。
+import { useState } from 'react'
 import { mockAiStatus } from '../../fixtures/mock/index.js'
 
 const GROUP_DETAIL = {
@@ -31,8 +32,55 @@ const GROUP_DETAIL = {
   },
 }
 
-export default function ManageDetailView({ group, onBack }) {
+export default function ManageDetailView({ group, onBack, products = [], onCreateProduct, onMergeProducts }) {
   const detail = GROUP_DETAIL[group?.id] || GROUP_DETAIL.products_services
+  const [draft, setDraft] = useState({ canonical_name: '', brand: '', specification: '' })
+  const [merge, setMerge] = useState({ source_product_id: '', target_product_id: '' })
+  const [error, setError] = useState('')
+
+  if (group?.id === 'products_services') {
+    const create = async () => {
+      setError('')
+      try {
+        await onCreateProduct?.(draft)
+        setDraft({ canonical_name: '', brand: '', specification: '' })
+      } catch (failure) { setError(failure.message) }
+    }
+    const mergeNow = async () => {
+      setError('')
+      try { await onMergeProducts?.({ source_product_id: Number(merge.source_product_id), target_product_id: Number(merge.target_product_id) }) }
+      catch (failure) { setError(failure.message) }
+    }
+    return (
+      <div className="v2-block v2-manage" data-testid="manage-detail-view">
+        <div className="v2-path"><button className="v2-link" onClick={onBack}>← 返回管理与设置</button></div>
+        <div className="v2-record-title">产品与服务</div>
+        {error && <p className="v2-inline-error">{error}</p>}
+        <div className="v2-section">
+          <strong>产品实体（{products.length}）</strong>
+          {products.map((product) => (
+            <div className="v2-kv" key={product.id}>
+              <span className="k">{product.canonical_name}</span>
+              <span className="v">{product.lifecycle_status} · {product.knowledge_status === 'incomplete' ? '资料待补充' : product.knowledge_status} · 购买{product.purchase_count}次</span>
+            </div>
+          ))}
+          {products.length === 0 && <div className="v2-state">暂无产品，可先创建草稿</div>}
+        </div>
+        <div className="v2-edit-inline">
+          <label>标准名称<input value={draft.canonical_name} onChange={(event) => setDraft((value) => ({ ...value, canonical_name: event.target.value }))} /></label>
+          <label>品牌（可空）<input value={draft.brand} onChange={(event) => setDraft((value) => ({ ...value, brand: event.target.value }))} /></label>
+          <label>规格（可空）<input value={draft.specification} onChange={(event) => setDraft((value) => ({ ...value, specification: event.target.value }))} /></label>
+          <button className="v2-btn" disabled={!draft.canonical_name.trim()} onClick={create}>生成新增确认卡</button>
+        </div>
+        {products.length >= 2 && <div className="v2-edit-inline">
+          <label>待合并产品<select value={merge.source_product_id} onChange={(event) => setMerge((value) => ({ ...value, source_product_id: event.target.value }))}><option value="">请选择</option>{products.filter((p) => ['draft', 'active'].includes(p.lifecycle_status)).map((p) => <option key={p.id} value={p.id}>{p.canonical_name}</option>)}</select></label>
+          <label>保留产品<select value={merge.target_product_id} onChange={(event) => setMerge((value) => ({ ...value, target_product_id: event.target.value }))}><option value="">请选择</option>{products.filter((p) => ['draft', 'active'].includes(p.lifecycle_status)).map((p) => <option key={p.id} value={p.id}>{p.canonical_name}</option>)}</select></label>
+          <button className="v2-btn" disabled={!merge.source_product_id || !merge.target_product_id || merge.source_product_id === merge.target_product_id} onClick={mergeNow}>生成合并确认卡</button>
+        </div>}
+        <p className="v2-hint">新增与合并不会在本页直接写入；将回到主对话完成一次最终确认。也可用文字或语音说“新增产品…”或“把…合并到…”。</p>
+      </div>
+    )
+  }
 
   if (detail.readOnly) {
     return (

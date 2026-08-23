@@ -73,6 +73,15 @@ export const api = {
   regenerateStage3Proposal: (id, data) => request(`/api/owner/proposals/${id}/regenerate`, { method: 'POST', body: JSON.stringify(data) }),
   getAuthoritativeCustomerRecord: (id) => request(`/api/owner/customers/${id}/record`),
   getStage3Status: () => request('/api/v2-stage3/status'),
+  // 阶段4客户事实与产品实体（所有写入仍返回统一 Proposal）
+  resolveProduct: (data) => request('/api/owner/products/resolve', { method: 'POST', body: JSON.stringify(data) }),
+  getProducts: () => request('/api/owner/products'),
+  getProduct: (id) => request(`/api/owner/products/${id}`),
+  createProductDraftProposal: (data) => request('/api/owner/products/draft-proposal', { method: 'POST', body: JSON.stringify(data) }),
+  createProductMergeProposal: (data) => request('/api/owner/products/merge-proposal', { method: 'POST', body: JSON.stringify(data) }),
+  createCustomerFactProposal: (customerId, data) => request(`/api/owner/customers/${customerId}/facts/proposal`, { method: 'POST', body: JSON.stringify(data) }),
+  resolveProposalProduct: (id, data) => request(`/api/owner/proposals/${id}/resolve-product`, { method: 'POST', body: JSON.stringify(data) }),
+  getStage4Status: () => request('/api/v2-stage4/status'),
   // 客户
   getCustomers: (search) =>
     request(`/api/customers${search ? `?search=${encodeURIComponent(search)}` : '?sort=last_consumed_desc'}`),

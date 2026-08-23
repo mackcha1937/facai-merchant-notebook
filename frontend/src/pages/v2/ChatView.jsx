@@ -3,6 +3,7 @@ import { api } from '../../api.js'
 import ChatComposer from '../../components/v2/ChatComposer.jsx'
 import ConfirmCard from '../../components/v2/ConfirmCard.jsx'
 import ReceiptCard from '../../components/v2/ReceiptCard.jsx'
+import ProductMatchCard from '../../components/v2/ProductMatchCard.jsx'
 
 function uniqueId(prefix) {
   const random = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -24,7 +25,7 @@ function dayLabel(value) {
   return value === today ? '今天' : value
 }
 
-export default function ChatView({ draftInput, onDraftChange, onAuthoritativeWrite, onPendingChange }) {
+export default function ChatView({ draftInput, onDraftChange, onAuthoritativeWrite, onPendingChange, refreshToken = 0 }) {
   const [messages, setMessages] = useState([])
   const [pending, setPending] = useState([])
   const [loading, setLoading] = useState(true)
@@ -62,7 +63,7 @@ export default function ChatView({ draftInput, onDraftChange, onAuthoritativeWri
       setLoading(false)
       setError(failure.message)
     })
-  }, [refresh])
+  }, [refresh, refreshToken])
 
   const loadEarlier = async () => {
     if (!cursor) return
@@ -127,7 +128,24 @@ export default function ChatView({ draftInput, onDraftChange, onAuthoritativeWri
   const editProposal = async (proposal, draft) => {
     const result = await api.editStage3Proposal(proposal.id, {
       idempotency_key: keyFor(proposal, 'edit'), data_version: proposal.data_version,
-      occurred_on: draft.date, quantities: { 0: draft.quantity },
+      occurred_on: draft.date || null,
+      quantities: draft.quantityActionIndex == null ? {} : { [draft.quantityActionIndex]: draft.quantity },
+      remove_action_indexes: draft.removeActionIndexes || [],
+    })
+    await refresh()
+    return result
+  }
+
+  const resolveProduct = async (proposal, choice = null, createNew = false) => {
+    const recognized = proposal.product_match?.recognized || {}
+    const result = await api.resolveProposalProduct(proposal.id, {
+      data_version: proposal.data_version,
+      idempotency_key: keyFor(proposal, createNew ? 'resolve-new' : `resolve-${choice?.id}`),
+      product_id: choice?.id || null,
+      create_new: createNew,
+      canonical_name: createNew ? recognized.name : null,
+      brand: createNew ? recognized.brand : null,
+      specification: createNew ? recognized.specification : null,
     })
     await refresh()
     return result
@@ -159,6 +177,17 @@ export default function ChatView({ draftInput, onDraftChange, onAuthoritativeWri
     }
     if (block.block_type === 'receipt_card') {
       return <ReceiptCard key={block.id} {...block.payload} />
+    }
+    if (block.block_type === 'product_match_card') {
+      const proposal = { ...block.payload, status: block.state, data_version: block.data_version }
+      return (
+        <ProductMatchCard
+          key={block.id}
+          match={proposal.product_match}
+          onChoose={(choice) => resolveProduct(proposal, choice, false)}
+          onAddNew={() => resolveProduct(proposal, null, true)}
+        />
+      )
     }
     return null
   }

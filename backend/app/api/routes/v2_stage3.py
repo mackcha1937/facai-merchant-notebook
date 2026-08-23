@@ -13,7 +13,9 @@ from app.core.database import get_db
 from app.core.rbac import require_owner
 from app.core.tenant import get_current_tenant_id
 from app.domain.errors import NotFoundError
-from app.infrastructure.models import LedgerEntry, Message, ConversationSession, PendingAction
+from app.infrastructure.models import (
+    CustomerFact, LedgerEntry, Message, ConversationSession, PendingAction, Product,
+)
 from app.schemas.conversation import (
     ChatTurnRequest,
     ProposalCancelRequest,
@@ -160,7 +162,22 @@ def get_current_customer_record(customer_id: int, db: Session = Depends(get_db))
             LedgerEntry.customer_id == customer_id,
         )
     ) or 0
-    result["data_version"] = int(last_ledger_id)
+    last_fact_id = db.scalar(
+        select(func.coalesce(func.max(CustomerFact.id), 0)).where(
+            CustomerFact.tenant_id == get_current_tenant_id(),
+            CustomerFact.customer_id == customer_id,
+        )
+    ) or 0
+    max_product_version = db.scalar(
+        select(func.coalesce(func.max(Product.version), 0))
+        .join(LedgerEntry, LedgerEntry.product_id == Product.id)
+        .where(
+            LedgerEntry.tenant_id == get_current_tenant_id(),
+            LedgerEntry.customer_id == customer_id,
+            Product.tenant_id == get_current_tenant_id(),
+        )
+    ) or 0
+    result["data_version"] = int(last_ledger_id) * 1_000_000 + int(last_fact_id) * 1_000 + int(max_product_version)
     result["authoritative"] = True
     return result
 

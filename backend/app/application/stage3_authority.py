@@ -7,20 +7,30 @@ from app.domain.errors import DomainError
 from app.repositories import customers as customer_repo
 from app.repositories import packages as package_repo
 from app.repositories import services as service_repo
+from app.repositories import customer_facts as fact_repo
+from app.repositories import products as product_repo
 
 
 def build_authority_snapshot(db: Session, parsed: dict) -> dict:
     customer_id = (parsed.get("customer") or {}).get("customer_id")
     customer = customer_repo.get_customer(db, customer_id) if customer_id else None
-    if customer is None:
+    customer_required = any(
+        action.get("type") in {
+            "create_package", "consume_service", "record_one_time_service",
+            "record_product_purchase", "query_customer", "upsert_customer_fact",
+            "delete_customer_fact",
+        }
+        for action in parsed.get("actions") or []
+    )
+    if customer_required and customer is None:
         raise DomainError("客户不存在或已删除")
 
     snapshot = {
-        "customer": {
+        "customer": ({
             "id": customer.id,
             "updated_at": customer.updated_at.isoformat() if customer.updated_at else None,
             "deleted": customer.deleted_at is not None,
-        },
+        } if customer else None),
         "actions": [],
     }
     for action in parsed.get("actions") or []:
@@ -49,8 +59,51 @@ def build_authority_snapshot(db: Session, parsed: dict) -> dict:
                 }
                 for p in packages
             ]
+        if action.get("type") == "record_product_purchase" and action.get("product_id"):
+            product = product_repo.get_product(db, action["product_id"], include_replaced=True)
+            item["product"] = _product_snapshot(product, action["product_id"])
+        if action.get("type") == "upsert_customer_fact" and customer:
+            current = fact_repo.get_current_by_type(db, customer.id, action.get("fact_type"))
+            item["current_fact"] = {
+                "id": current.id,
+                "normalized_value": current.normalized_value,
+                "valid_to": current.valid_to.isoformat() if current.valid_to else None,
+                "updated_at": current.updated_at.isoformat() if current.updated_at else None,
+            } if current else None
+        if action.get("type") == "delete_customer_fact" and customer:
+            current = fact_repo.get_current_by_type(db, customer.id, action.get("fact_type"))
+            item["current_fact"] = {
+                "id": current.id,
+                "normalized_value": current.normalized_value,
+                "valid_to": current.valid_to.isoformat() if current.valid_to else None,
+                "updated_at": current.updated_at.isoformat() if current.updated_at else None,
+            } if current else None
+        if action.get("type") == "create_product":
+            item["identity"] = {
+                "canonical_name": action.get("canonical_name"),
+                "brand": action.get("brand"),
+                "specification": action.get("specification"),
+            }
+        if action.get("type") == "merge_product":
+            source = product_repo.get_product(db, action.get("source_product_id"), include_replaced=True)
+            target = product_repo.get_product(db, action.get("target_product_id"), include_replaced=True)
+            item["source"] = _product_snapshot(source, action.get("source_product_id"))
+            item["target"] = _product_snapshot(target, action.get("target_product_id"))
         snapshot["actions"].append(item)
     return snapshot
+
+
+def _product_snapshot(product, requested_id: int | None) -> dict:
+    if product is None:
+        return {"id": requested_id, "status": "missing"}
+    return {
+        "id": product.id,
+        "version": product.version,
+        "lifecycle_status": product.lifecycle_status,
+        "knowledge_status": product.knowledge_status,
+        "merged_into_id": product.merged_into_id,
+        "deleted": product.deleted_at is not None,
+    }
 
 
 def snapshot_diff(before: dict, current: dict) -> list[dict]:

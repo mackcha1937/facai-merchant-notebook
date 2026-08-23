@@ -22,6 +22,7 @@ from app.api.routes import (
     v2_stage1,
     v2_stage2,
     v2_stage3,
+    v2_stage4,
 )
 from app.core.config import get_settings
 from app.core.database import init_db
@@ -104,6 +105,7 @@ app.include_router(v2_stage0.router)
 app.include_router(v2_stage1.router)
 app.include_router(v2_stage2.router)
 app.include_router(v2_stage3.router)
+app.include_router(v2_stage4.router)
 
 # ---- 前后端合并：后端托管前端构建产物（单端口运行） ----
 FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
