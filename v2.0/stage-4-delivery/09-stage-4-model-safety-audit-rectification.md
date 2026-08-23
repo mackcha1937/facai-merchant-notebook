@@ -2,7 +2,7 @@
 
 ## 1. 审计结论
 
-本次整改关闭了独立验收发现的四个模型安全缺口，未扩大阶段4范围。真实 DeepSeek 请求执行次数为 0；阶段5、RAG、Embedding 和推荐均未开始。
+本次整改关闭了独立验收发现的模型安全缺口，未扩大阶段4范围。此后在唯一授权窗口执行了累计 1 次隔离真实 DeepSeek 请求；本轮离线协议整改没有新增真实请求。阶段5、RAG、Embedding 和推荐均未开始。
 
 ## 2. 阻断项与修复证据
 
@@ -27,13 +27,13 @@
 
 ## 4. 最终验证
 
-- 后端：221 passed；
+- 后端：224 passed；
 - 前端：38 passed（7 个测试文件）；
 - 生产构建：通过，75 modules transformed；
-- 阶段4模型运行链：38 项 MockModel/安全测试；
+- 阶段4模型运行链：39 项 MockModel/安全测试，另有 2 项 MockTransport Adapter 契约测试；
 - Migration 往返：`0016 → 0017 → 0016 → 0017`，正式库停留在 `0017_stage4_entity_hardening` 且 `integrity_check=ok`；
-- 真实 DeepSeek 付费请求：0。
+- 真实 DeepSeek 请求累计：1 次，HTTP 200，但候选为 `rejected_fallback`；CustomerFact / Product / LedgerEntry 均 0 写入，仅 1 个未确认 Proposal；不构成真实模型验收。
 
 ## 5. 停点
 
-真实模型验证仍等待店主单独授权。授权前保持 `ENABLE_V2_REAL_MODEL=false`；本整改完成后暂停，不自动开始阶段5。
+下一次真实模型验证仍需店主重新授权。授权前保持 `ENABLE_V2_REAL_MODEL=false`；本整改完成后暂停，不自动开始阶段5。

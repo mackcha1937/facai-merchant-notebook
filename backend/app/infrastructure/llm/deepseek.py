@@ -87,6 +87,8 @@ class DeepSeekAdapter(ModelAdapter):
         payload = {
             "model": s.deepseek_model_id,
             "messages": messages,
+            "response_format": {"type": "json_object"},
+            "thinking": {"type": "disabled"},
             "temperature": temperature,
             "max_tokens": 2000,
             "stream": False,

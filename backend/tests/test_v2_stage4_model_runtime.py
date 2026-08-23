@@ -98,6 +98,28 @@ def valid_model_json():
     }, ensure_ascii=False)
 
 
+def test_stage4_system_prompt_contains_complete_valid_json_example():
+    prompt = stage4_model_service._system_prompt()
+    example = json.loads(prompt.split("完整合法 JSON 示例：\n", 1)[1])
+
+    assert set(example) == {
+        "intent", "customer_query", "customer_evidence", "facts",
+        "product_purchase", "needs_clarification", "clarification_question",
+    }
+    assert set(example["facts"][0]) == {
+        "fact_type", "display_value", "evidence_text", "confidence",
+        "sensitivity_level",
+    }
+    assert set(example["product_purchase"]) == {
+        "name", "brand", "specification", "quantity", "evidence_text", "confidence",
+    }
+    assert example["clarification_question"] is None
+    assert stage4_model_service.parse_and_validate(
+        json.dumps(example, ensure_ascii=False),
+        "甲姐偏爱低泡洁面，今天买了发财清透洁面100ml两瓶。",
+    ).intent == "product_purchase"
+
+
 def test_configured_v2_runtime_constructs_deepseek_adapter_and_calls_chat(db_session, monkeypatch):
     seed_customer(db_session)
     model = MockModel(valid_model_json())
