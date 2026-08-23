@@ -1,0 +1,38 @@
+{
+  "stage": 7,
+  "status": "通过",
+  "backend": {
+    "passed": 284,
+    "warning": "1条既有Starlette TestClient弃用警告"
+  },
+  "frontend": {
+    "passed": 51,
+    "files": 10
+  },
+  "build": {
+    "status": "通过",
+    "modules_transformed": 81
+  },
+  "evaluation_suite": {
+    "cases": 60,
+    "safety_critical": 49,
+    "runner": "stage7-jsonl-manifest-v2",
+    "automatic_runtime_executor": false
+  },
+  "migration": "0020_stage7_evaluation_release",
+  "integrity_check": "ok",
+  "foreign_key_errors": 0,
+  "formal_stage7_rows": 0,
+  "browser": {
+    "desktop": "1440x1000通过",
+    "mobile": "390x844通过",
+    "minimum_control_height": 44
+  },
+  "external_calls": {
+    "chat_model": 0,
+    "embedding": 0,
+    "messages": 0
+  },
+  "real_model_enabled": false,
+  "public_deployment": false
+}

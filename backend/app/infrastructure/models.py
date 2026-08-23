@@ -636,6 +636,8 @@ class AIConfigDraft(Base):
     config_type: Mapped[str] = mapped_column(String(40), nullable=False)
     content_json: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False)
+    content_checksum: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    data_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
@@ -648,10 +650,17 @@ class PromptRelease(Base):
     tenant_id: Mapped[int] = mapped_column(Integer, nullable=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     config_snapshot_json: Mapped[str] = mapped_column(Text, nullable=False)
+    source_draft_id: Mapped[int | None] = mapped_column(ForeignKey("ai_config_drafts.id"), nullable=True)
+    evaluation_run_id: Mapped[int | None] = mapped_column(ForeignKey("evaluation_runs.id"), nullable=True)
+    published_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False)
     published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     rolled_back_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "version", name="uq_prompt_releases_tenant_version"),
+    )
 
 
 class RagRelease(Base):
@@ -661,10 +670,17 @@ class RagRelease(Base):
     tenant_id: Mapped[int] = mapped_column(Integer, nullable=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     config_snapshot_json: Mapped[str] = mapped_column(Text, nullable=False)
+    source_draft_id: Mapped[int | None] = mapped_column(ForeignKey("ai_config_drafts.id"), nullable=True)
+    evaluation_run_id: Mapped[int | None] = mapped_column(ForeignKey("evaluation_runs.id"), nullable=True)
+    published_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False)
     published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     rolled_back_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "version", name="uq_rag_releases_tenant_version"),
+    )
 
 
 class RecommendationRelease(Base):
@@ -674,10 +690,17 @@ class RecommendationRelease(Base):
     tenant_id: Mapped[int] = mapped_column(Integer, nullable=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     config_snapshot_json: Mapped[str] = mapped_column(Text, nullable=False)
+    source_draft_id: Mapped[int | None] = mapped_column(ForeignKey("ai_config_drafts.id"), nullable=True)
+    evaluation_run_id: Mapped[int | None] = mapped_column(ForeignKey("evaluation_runs.id"), nullable=True)
+    published_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False)
     published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     rolled_back_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "version", name="uq_recommendation_releases_tenant_version"),
+    )
 
 
 class EvaluationRun(Base):
@@ -685,11 +708,20 @@ class EvaluationRun(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     tenant_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    draft_id: Mapped[int | None] = mapped_column(ForeignKey("ai_config_drafts.id"), nullable=True)
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    suite_checksum: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    runner_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    run_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
     config_snapshot_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "run_key", name="uq_evaluation_runs_tenant_run_key"),
+    )
 
 
 class EvaluationCaseResult(Base):
@@ -699,9 +731,24 @@ class EvaluationCaseResult(Base):
     tenant_id: Mapped[int] = mapped_column(Integer, nullable=False)
     run_id: Mapped[int] = mapped_column(Integer, nullable=False)
     case_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    category: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    priority: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    safety_critical: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    expected_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     output_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    assertion_results_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    factual_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    safety_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    natural_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    interaction_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     passed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "run_id", "case_id", name="uq_evaluation_results_tenant_run_case"),
+    )
 
 
 class ReleaseAudit(Base):
@@ -713,9 +760,15 @@ class ReleaseAudit(Base):
     release_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     actor_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     action: Mapped[str] = mapped_column(String(30), nullable=False)
+    request_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    idempotency_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
     before_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     after_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "idempotency_key", name="uq_release_audits_tenant_idempotency"),
+    )
 
 
 class OwnerAIFeedback(Base):

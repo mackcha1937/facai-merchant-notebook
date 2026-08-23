@@ -64,7 +64,8 @@ def test_0019_reuses_existing_tables_and_roundtrip_preserves_stage1_to5_data(tmp
     before_hash, before = snapshot(conn)
     conn.close()
 
-    command.upgrade(cfg, "head")
+    # 本用例只验证阶段6迁移兼容；后续阶段新增head后仍应停在0019断言。
+    command.upgrade(cfg, "0019_stage6_recommendation_feedback")
     conn = sqlite3.connect(path)
     after_hash, after = snapshot(conn)
     tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
@@ -85,7 +86,7 @@ def test_0019_reuses_existing_tables_and_roundtrip_preserves_stage1_to5_data(tmp
     assert "recommendation_action_audits" not in {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     conn.close()
 
-    command.upgrade(cfg, "head")
+    command.upgrade(cfg, "0019_stage6_recommendation_feedback")
     conn = sqlite3.connect(path)
     reup_hash, reup = snapshot(conn)
     assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
@@ -107,7 +108,7 @@ def test_0019_accepts_create_all_prebuilt_empty_action_audit_table(tmp_path):
     assert conn.execute("SELECT count(*) FROM recommendation_action_audits").fetchone()[0] == 0
     conn.close()
 
-    command.upgrade(cfg, "head")
+    command.upgrade(cfg, "0019_stage6_recommendation_feedback")
     conn = sqlite3.connect(path)
     assert conn.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0019_stage6_recommendation_feedback"
     foreign = conn.execute("PRAGMA foreign_key_list(recommendation_action_audits)").fetchall()

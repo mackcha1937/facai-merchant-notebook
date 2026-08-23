@@ -218,6 +218,45 @@ textarea:focus {
   flex-wrap: wrap;
 }
 
+/* 阶段7管理员测评台：手机/桌面统一满足44px点击目标。 */
+.stage7-admin label {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.stage7-admin button,
+.stage7-admin input,
+.stage7-admin select {
+  min-height: 44px;
+}
+
+.stage7-admin textarea {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  resize: vertical;
+}
+
+.stage7-admin .row-actions a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+@media (max-width: 767px) {
+  .stage7-admin .list-item:not(.column) {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .stage7-admin button,
+  .stage7-admin .row-actions > * {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .detail-header {
   display: flex;
   align-items: center;
