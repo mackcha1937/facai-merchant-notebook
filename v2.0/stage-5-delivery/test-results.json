@@ -1,6 +1,6 @@
 {
   "status": "通过",
-  "backend": "252 passed（含阶段1—4全回归与28项阶段5知识/RAG/Migration验收）",
+  "backend": "253 passed（含阶段1—4全回归与29项阶段5知识/RAG/Migration/状态租户隔离验收）",
   "frontend": "42 passed（8个测试文件）",
   "build": "Vite生产构建通过（77 modules transformed）",
   "migration_cycle": "0017 → 0018 → 0017 → 0018，通过",
@@ -11,7 +11,7 @@
     "counts": "customers4 / services5 / packages3 / ledger4 / facts0 / products1 / aliases0 / proposals8 / documents0 / chunks0 / embeddings0"
   },
   "browser": "Chromium桌面1440×1000与手机390×844通过；店主只读状态无技术写控件，手机无横向溢出；虚构5文档/5 Chunk/5本地索引检索通过",
-  "security": "tenant/entity/confirmed/active/current-version强过滤；title/content双重门禁；PII查询零Embedding调用；旧版/撤回/未确认/停用/跨店零泄漏",
+  "security": "tenant/entity/confirmed/active/current-version强过滤；状态API四项计数绑定当前tenant且Chunk/Embedding关联父文档tenant；title/content双重门禁；PII查询零Embedding调用；旧版/撤回/未确认/停用/跨店零泄漏",
   "embedding": "facai-local / char-ngram-sha256-v1 / 32维；checksum幂等；不同维度不混用",
   "external_calls": "DeepSeek 0；外部Embedding 0；模型下载0",
   "stage6": "未开始：Recommendation、Top3、提醒、话术、反馈均未建设",

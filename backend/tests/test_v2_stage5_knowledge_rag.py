@@ -392,3 +392,61 @@ def test_pii_retrieval_query_never_enters_embedding_adapter(db_session, monkeypa
     result = rag_service.retrieve(db_session, KnowledgeRetrieveRequest(query="净痘修护面霜 138-0013-8000"))
     assert result["vector_state"] == "unsafe_query_skipped"
     assert result["evidence"] == []
+
+
+def test_stage5_status_api_counts_and_owner_reads_never_leak_cross_tenant_rows(client, db_session):
+    product_one = add_product(db_session, "租户一审计面霜", tenant=1)
+    publish(
+        db_session, product_one, key="status-tenant-one",
+        content="租户一审计面霜为日常护肤商品，只用于租户隔离测试。",
+    )
+    before = client.get("/api/v2-stage5/status")
+    assert before.status_code == 200
+    assert before.json()["counts"] == {
+        "knowledge_documents": 1,
+        "active_documents": 1,
+        "knowledge_chunks": 1,
+        "embedding_records": 1,
+    }
+
+    set_current_tenant_id(2)
+    set_current_owner_id(2)
+    product_two = add_product(db_session, "租户二隔离面霜", tenant=2)
+    publish(
+        db_session, product_two, key="status-tenant-two",
+        content="租户二隔离面霜资料绝不能出现在租户一状态或检索结果中。",
+    )
+    document_two = db_session.scalar(select(KnowledgeDocument).where(
+        KnowledgeDocument.tenant_id == 2,
+    ))
+    # 模拟异常错 tenant 子记录：自身标为 tenant1、父文档实际属于 tenant2。
+    # 状态统计必须同时关联父文档 tenant，不能仅相信子记录 tenant_id。
+    db_session.add(KnowledgeChunk(
+        tenant_id=1, document_id=document_two.id, chunk_index=99,
+        text="异常跨店 Chunk", status="active", checksum="cross-tenant-chunk",
+    ))
+    db_session.add(EmbeddingRecord(
+        tenant_id=1, document_id=document_two.id, knowledge_version=1,
+        embedding_provider="facai-local", embedding_model="char-ngram-sha256-v1",
+        dimension=32, vector_ref="[]", checksum="cross-tenant-embedding", status="indexed",
+    ))
+    db_session.commit()
+
+    set_current_tenant_id(1)
+    set_current_owner_id(1)
+    after = client.get("/api/v2-stage5/status")
+    assert after.status_code == 200
+    assert after.json()["counts"] == before.json()["counts"]
+
+    owner_status = client.get("/api/owner/knowledge/status")
+    owner_list = client.get("/api/owner/knowledge")
+    retrieved = client.post("/api/owner/knowledge/retrieve", json={
+        "query": "租户一审计面霜", "entity_type": "product",
+        "entity_id": product_one.id, "limit": 5,
+    })
+    assert owner_status.status_code == owner_list.status_code == retrieved.status_code == 200
+    assert owner_status.json()["knowledge_complete_count"] == 1
+    assert owner_status.json()["embedding"]["indexed"] == 1
+    assert len(owner_list.json()) == 1
+    assert all(item["document_id"] != document_two.id for item in owner_list.json())
+    assert {item["entity_id"] for item in retrieved.json()["evidence"]} == {product_one.id}

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.application import knowledge_service, rag_service, stage3_proposal_service
 from app.core.database import get_db
 from app.core.rbac import require_admin, require_owner
+from app.core.tenant import get_current_tenant_id
 from app.infrastructure.models import EmbeddingRecord, KnowledgeChunk, KnowledgeDocument
 from app.schemas.conversation import (
     KnowledgeProposalRequest, KnowledgeRetrieveRequest, KnowledgeWithdrawRequest,
@@ -73,17 +74,33 @@ def admin_reindex(entity_type: str, entity_id: int, db: Session = Depends(get_db
 @router.get("/v2-stage5/status")
 def stage5_status(db: Session = Depends(get_db)):
     require_owner()
+    tenant_id = get_current_tenant_id()
     try:
         migration = db.execute(text("SELECT version_num FROM alembic_version")).scalar_one_or_none()
     except OperationalError:
         migration = "metadata-test-db"
     counts = {
-        "knowledge_documents": db.scalar(select(func.count(KnowledgeDocument.id))) or 0,
-        "active_documents": db.scalar(select(func.count(KnowledgeDocument.id)).where(
-            KnowledgeDocument.confirmed.is_(True), KnowledgeDocument.active.is_(True),
+        "knowledge_documents": db.scalar(select(func.count(KnowledgeDocument.id)).where(
+            KnowledgeDocument.tenant_id == tenant_id,
         )) or 0,
-        "knowledge_chunks": db.scalar(select(func.count(KnowledgeChunk.id))) or 0,
-        "embedding_records": db.scalar(select(func.count(EmbeddingRecord.id))) or 0,
+        "active_documents": db.scalar(select(func.count(KnowledgeDocument.id)).where(
+            KnowledgeDocument.tenant_id == tenant_id,
+            KnowledgeDocument.confirmed.is_(True), KnowledgeDocument.active.is_(True),
+            KnowledgeDocument.status == "published",
+            KnowledgeDocument.withdrawn_at.is_(None),
+        )) or 0,
+        "knowledge_chunks": db.scalar(select(func.count(KnowledgeChunk.id)).join(
+            KnowledgeDocument, KnowledgeDocument.id == KnowledgeChunk.document_id,
+        ).where(
+            KnowledgeChunk.tenant_id == tenant_id,
+            KnowledgeDocument.tenant_id == tenant_id,
+        )) or 0,
+        "embedding_records": db.scalar(select(func.count(EmbeddingRecord.id)).join(
+            KnowledgeDocument, KnowledgeDocument.id == EmbeddingRecord.document_id,
+        ).where(
+            EmbeddingRecord.tenant_id == tenant_id,
+            KnowledgeDocument.tenant_id == tenant_id,
+        )) or 0,
     }
     root = Path(__file__).resolve().parents[4]
     report_path = root / "v2.0" / "stage-5-delivery" / "test-results.json"

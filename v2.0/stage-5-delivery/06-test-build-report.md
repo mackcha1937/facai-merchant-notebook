@@ -2,7 +2,7 @@
 
 ## 自动测试
 
-- 后端：252 passed（含阶段1—4全回归及阶段5知识、权限、版本、Migration、Embedding、检索与安全用例）。
+- 后端：253 passed（含阶段1—4全回归及阶段5知识、权限、版本、Migration、Embedding、检索、状态租户隔离与安全用例）。
 - 前端：42 passed / 8 test files。
 - 生产构建：Vite 通过，77 modules transformed。
 
@@ -21,6 +21,7 @@
 - 店主无知识写路由，管理员路由拒绝店主；
 - Proposal 幂等、stale、跨店和事务边界；
 - `0018 → 0017 → 0018` 与原数据完整性。
+- 状态 API 四项计数全部限定当前 tenant；Chunk/Embedding 同时验证自身 tenant 与父 KnowledgeDocument tenant，异常错 tenant 子记录不计入。
 
 ## 外部调用
 
@@ -33,7 +34,7 @@
 
 - `git diff --check`
 - Git 跟踪文件敏感信息扫描
-- 后端 252 tests
+- 后端 253 tests
 - 前端 42 tests
 - 生产构建 77 modules
 - Migration 往返与 SQLite integrity/foreign key 检查
