@@ -11,8 +11,18 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.core.database import get_db
+from app.core.config import get_settings
 from app.infrastructure.models import Base
 from app.main import app
+
+
+@pytest.fixture(autouse=True)
+def disable_paid_model_calls(monkeypatch):
+    """自动测试默认禁用真实模型；需要模型的用例显式注入 MockModel。"""
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 @pytest.fixture()

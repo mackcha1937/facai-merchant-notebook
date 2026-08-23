@@ -1,6 +1,6 @@
 {
   "status": "通过",
-  "backend": "182 项通过（含阶段1—阶段4回归）",
+  "backend": "195 项通过（含阶段1—阶段4回归与 13 项 MockModel/安全运行链测试）",
   "frontend": "38 项通过（7 个测试文件）",
   "build": "Vite 生产构建通过（75 modules transformed）",
   "sensitive_scan": "通过；应用源码、前端产物与 V2 文档无真实 key 命中",
@@ -10,6 +10,11 @@
     "after": "客户4 / 套餐3 / 账本4（有效3）/ 事实0 / 产品1 / 别名0 / 剩余10"
   },
   "browser": "Chromium 实测：1470×771 桌面、390×844 手机；阶段4验证页、真实产品匹配、产品管理、客户读模型和手机对话通过",
-  "external_model": "未调用外部收费模型 API",
+  "model_runtime": {
+    "code_path": "V2 主对话已接通 DeepSeekAdapter 结构化候选路径",
+    "automatic_test": "MockModel 已通过",
+    "paid_call": "未执行，等待单独授权"
+  },
+  "external_model": "未调用外部收费模型 API；不宣称真实模型已验收",
   "rag": "未建设"
 }

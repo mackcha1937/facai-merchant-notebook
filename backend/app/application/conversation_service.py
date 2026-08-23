@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.application.relative_dates import resolve_relative_date, shanghai_now
 from app.application.stage3_authority import build_authority_snapshot, canonical_json
+from app.application import stage4_model_service
 from app.core.tenant import get_current_owner_id, get_current_tenant_id
 from app.domain.errors import DomainError
 from app.infrastructure.models import (
@@ -140,6 +141,9 @@ def proposal_dict(proposal: AgentProposal) -> dict:
         "resolution_required": parsed.get("resolution_required", False),
         "resolution_idempotency_key": parsed.get("resolution_idempotency_key"),
         "fact_extraction_source": parsed.get("fact_extraction_source"),
+        "model_runtime": parsed.get("model_runtime"),
+        "needs_clarification": parsed.get("needs_clarification", False),
+        "clarification_question": parsed.get("clarification_question"),
         "result": _load_json(proposal.result_json, None),
     }
 
@@ -188,7 +192,7 @@ def history(db: Session, before: int | None = None, limit: int = 30) -> dict:
     }
 
 
-def _resolve_customer(db: Session, text: str):
+def _resolve_customer(db: Session, text: str, model_query: str | None = None):
     candidates = []
     for customer in customer_repo.list_customers(db):
         names = [customer.display_name] + [a.alias for a in customer.aliases if a.deleted_at is None]
@@ -196,6 +200,15 @@ def _resolve_customer(db: Session, text: str):
         if hits:
             candidates.append((max(hits, key=len), customer))
     candidates.sort(key=lambda item: len(item[0]), reverse=True)
+    if not candidates and model_query:
+        query = model_query.strip()
+        for customer in customer_repo.list_customers(db):
+            names = [customer.display_name] + [
+                alias.alias for alias in customer.aliases if alias.deleted_at is None
+            ]
+            exact = [name for name in names if name and name == query]
+            if exact:
+                candidates.append((exact[0], customer))
     if not candidates:
         return None, None
     if len(candidates) > 1 and len(candidates[0][0]) == len(candidates[1][0]):
@@ -208,11 +221,31 @@ def _quantity_after(text: str, name: str) -> int:
     return int(match.group(1)) if match else 1
 
 
-def _controlled_parse(db: Session, text: str, now: datetime | None = None) -> tuple[dict | None, list[dict]]:
-    customer, surface = _resolve_customer(db, text)
+def _controlled_parse(
+    db: Session, text: str, now: datetime | None = None
+) -> tuple[dict | None, list[dict], dict]:
+    model_result = stage4_model_service.run(text)
+    model_candidate = model_result.get("candidate")
+    model_runtime = {
+        "attempted": model_result["attempted"],
+        "status": model_result["status"],
+        "intent": model_candidate.intent if model_candidate else None,
+    }
+    customer, surface = _resolve_customer(
+        db, text, model_candidate.customer_query if model_candidate else None
+    )
     if customer is None:
         product_management = _parse_product_management(db, text)
-        return (product_management, []) if product_management else (None, [])
+        if product_management:
+            product_management["model_runtime"] = model_runtime
+            return product_management, [], model_runtime
+        return None, [], {
+            **model_runtime,
+            "clarification_question": (
+                model_candidate.clarification_question
+                if model_candidate and model_candidate.needs_clarification else None
+            ),
+        }
     actions = []
     mentions = [{"entity_type": "customer", "entity_id": customer.id, "surface_text": surface}]
     for service in service_repo.list_services(db):
@@ -229,14 +262,12 @@ def _controlled_parse(db: Session, text: str, now: datetime | None = None) -> tu
         )
         mentions.append({"entity_type": "service", "entity_id": service.id, "surface_text": service.name})
 
-    adapter = None
-    from app.core.config import get_settings
-
-    if get_settings().is_model_configured:
-        from app.infrastructure.llm.deepseek import DeepSeekAdapter
-
-        adapter = DeepSeekAdapter()
-    facts, fact_source = extract_fact_candidates(db, customer.id, text, adapter=adapter)
+    model_facts = [
+        item.model_dump() for item in (model_candidate.facts if model_candidate else [])
+    ]
+    facts, fact_source = extract_fact_candidates(
+        db, customer.id, text, validated_model_items=model_facts
+    )
     for fact in facts:
         actions.append({"type": "upsert_customer_fact", **fact})
 
@@ -254,10 +285,31 @@ def _controlled_parse(db: Session, text: str, now: datetime | None = None) -> tu
                     "evidence_text": text,
                 })
 
-    purchase = extract_product_purchase(text)
+    model_purchase = model_candidate.product_purchase if model_candidate else None
+    if model_purchase:
+        purchase = {
+            "query": model_purchase.name,
+            "quantity": model_purchase.quantity,
+            "brand": model_purchase.brand,
+            "specification": model_purchase.specification,
+            "evidence_text": model_purchase.evidence_text,
+            "confidence": model_purchase.confidence,
+            "extraction_source": "model",
+        }
+    else:
+        purchase = extract_product_purchase(text)
+        if purchase:
+            purchase.update({
+                "brand": None, "specification": None,
+                "evidence_text": text, "confidence": None,
+                "extraction_source": "rule",
+            })
     product_match = None
     if purchase:
-        product_match = resolve_product(db, purchase["query"])
+        product_match = resolve_product(
+            db, purchase["query"], brand=purchase.get("brand"),
+            specification=purchase.get("specification"),
+        )
         if product_match["status"] == "exact":
             product = product_match["matched"]
             actions.append({
@@ -272,7 +324,13 @@ def _controlled_parse(db: Session, text: str, now: datetime | None = None) -> tu
             })
 
     if not actions and not purchase:
-        return None, mentions
+        return None, mentions, {
+            **model_runtime,
+            "clarification_question": (
+                model_candidate.clarification_question
+                if model_candidate and model_candidate.needs_clarification else None
+            ),
+        }
     resolved = resolve_relative_date(text, now.astimezone(shanghai_now().tzinfo) if now and now.tzinfo else now)
     for action in actions:
         if action["type"] in {"consume_service", "record_one_time_service", "record_product_purchase"}:
@@ -292,8 +350,11 @@ def _controlled_parse(db: Session, text: str, now: datetime | None = None) -> tu
         "product_purchase": purchase,
         "resolution_required": resolution_required,
         "fact_extraction_source": fact_source,
+        "model_runtime": model_runtime,
+        "needs_clarification": False,
+        "clarification_question": None,
     }
-    return parsed, mentions
+    return parsed, mentions, model_runtime
 
 
 def _parse_product_management(db: Session, text: str) -> dict | None:
@@ -396,7 +457,7 @@ def chat_turn(db: Session, data, now: datetime | None = None) -> dict:
     thread = get_or_create_thread(db)
     session = get_or_create_session(db, thread, now)
     text = data.text.strip()
-    parsed, mentions = _controlled_parse(db, text, now)
+    parsed, mentions, parse_runtime = _controlled_parse(db, text, now)
     created_at = _utc_naive(now)
     owner_message = Message(
         tenant_id=get_current_tenant_id(), session_id=session.id, role="owner",
@@ -407,7 +468,10 @@ def chat_turn(db: Session, data, now: datetime | None = None) -> dict:
     _save_mentions(db, owner_message.id, mentions)
 
     if parsed is None:
-        assistant_text = "我已保留这条消息，但还不能确定客户和可记账的服务，请补充客户称呼与已有服务名称。"
+        assistant_text = parse_runtime.get("clarification_question") or (
+            "我已保留这条消息，但还不能确定客户和可记账的服务，"
+            "请补充客户称呼与已有服务名称。"
+        )
         assistant = Message(
             tenant_id=get_current_tenant_id(), session_id=session.id, role="assistant",
             content=assistant_text, message_type="text", created_at=created_at,
@@ -416,7 +480,10 @@ def chat_turn(db: Session, data, now: datetime | None = None) -> dict:
         thread.last_active_at = created_at
         _update_summary(db, session, mentions, None)
         db.commit()
-        return {"status": "needs_clarification", "proposal": None, "message": assistant_text}
+        return {
+            "status": "needs_clarification", "proposal": None,
+            "message": assistant_text, "model_runtime": parse_runtime,
+        }
 
     authority = build_authority_snapshot(db, parsed)
     expires_at = created_at + timedelta(hours=24)

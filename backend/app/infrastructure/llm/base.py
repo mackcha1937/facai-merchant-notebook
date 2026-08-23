@@ -17,6 +17,10 @@ class ModelError(Exception):
     """模型调用失败（信息已脱敏）。"""
 
 
+class ModelTimeoutError(ModelError):
+    """模型请求超时；调用方可安全降级。"""
+
+
 class ModelAdapter(ABC):
     """所有模型适配器需要实现的统一接口。"""
 

@@ -5,7 +5,12 @@
 import httpx
 
 from app.core.logging import sanitize_text
-from app.infrastructure.llm.base import ModelAdapter, ModelCheckResult, ModelError
+from app.infrastructure.llm.base import (
+    ModelAdapter,
+    ModelCheckResult,
+    ModelError,
+    ModelTimeoutError,
+)
 
 
 class DeepSeekAdapter(ModelAdapter):
@@ -90,6 +95,8 @@ class DeepSeekAdapter(ModelAdapter):
         try:
             with httpx.Client(timeout=s.model_request_timeout_seconds) as client:
                 resp = client.post(url, json=payload, headers=self._headers())
+        except httpx.TimeoutException as exc:
+            raise ModelTimeoutError("模型请求超时，请稍后重试。") from exc
         except httpx.HTTPError as exc:
             raise ModelError(sanitize_text(f"模型网络请求失败：{exc}", secret)) from exc
 

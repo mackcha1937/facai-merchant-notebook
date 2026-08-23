@@ -1,15 +1,14 @@
 """阶段4客户事实候选提取与权威冲突标注。
 
-模型可用时可注入 ModelAdapter 获取严格 JSON；模型不可用时使用保守规则降级。
-两条路径都只产生候选，确认前不写 CustomerFact。
+模型候选必须先经 stage4_model_service 的严格校验；本模块再与
+保守规则去重合并并标注权威冲突。两条路径都只产生候选，
+确认前不写 CustomerFact。
 """
-import json
 import re
 import unicodedata
 
 from sqlalchemy.orm import Session
 
-from app.infrastructure.llm.base import ModelError
 from app.repositories import customer_facts as fact_repo
 
 
@@ -81,49 +80,35 @@ def _rule_candidates(text: str) -> list[dict]:
     return list(unique.values())
 
 
-def _model_candidates(text: str, adapter) -> list[dict]:
-    prompt = (
-        "你只提取店主原话中明确出现的客户事实。输出 JSON 数组，每项仅含 fact_type、"
-        "display_value、evidence_text、confidence、sensitivity_level。fact_type 只能是："
-        + "、".join(sorted(ALLOWED_FACT_TYPES))
-        + "。evidence_text 必须是原文连续片段。健康、不适、生日标 sensitive。不要诊断或推断。"
-    )
-    raw = adapter.chat(
-        [{"role": "system", "content": prompt}, {"role": "user", "content": text}],
-        temperature=0.0,
-    )
-    data = json.loads(raw)
-    if not isinstance(data, list):
-        raise ValueError("事实提取结果不是数组")
-    result = []
-    for item in data[:10]:
-        fact_type = str(item.get("fact_type") or "")
-        value = str(item.get("display_value") or "").strip()
-        evidence = str(item.get("evidence_text") or "").strip()
-        if fact_type not in ALLOWED_FACT_TYPES or not value or not evidence or evidence not in text:
-            continue
-        confidence = max(0.0, min(1.0, float(item.get("confidence", 0.5))))
-        sensitivity = "sensitive" if item.get("sensitivity_level") == "sensitive" else "normal"
-        result.append(_candidate(fact_type, value, evidence, confidence, sensitivity))
-    return result
-
-
 def extract_fact_candidates(
-    db: Session, customer_id: int, text: str, *, adapter=None
+    db: Session,
+    customer_id: int,
+    text: str,
+    *,
+    validated_model_items: list[dict] | None = None,
 ) -> tuple[list[dict], str]:
-    source = "rule_fallback"
-    items: list[dict]
-    if adapter is not None:
-        try:
-            items = _model_candidates(text, adapter)
-            source = "model"
-        except (ModelError, ValueError, TypeError, json.JSONDecodeError):
-            items = _rule_candidates(text)
-    else:
-        items = _rule_candidates(text)
+    rules = _rule_candidates(text)
+    model_items = [
+        _candidate(
+            item["fact_type"], item["display_value"], item["evidence_text"],
+            item["confidence"], item["sensitivity_level"],
+        )
+        for item in (validated_model_items or [])
+        if item.get("fact_type") in ALLOWED_FACT_TYPES
+    ]
+    source = "model_and_rules" if model_items else "rule_fallback"
+    unique = {
+        (item["fact_type"], item["normalized_value"]): {**item, "extraction_source": "model"}
+        for item in model_items
+    }
+    for item in rules:
+        unique.setdefault(
+            (item["fact_type"], item["normalized_value"]),
+            {**item, "extraction_source": "rule"},
+        )
 
     result = []
-    for item in items:
+    for item in unique.values():
         current = fact_repo.get_current_by_type(db, customer_id, item["fact_type"])
         if current and current.normalized_value == item["normalized_value"]:
             continue
@@ -132,6 +117,6 @@ def extract_fact_candidates(
             "supersedes_id": current.id if current else None,
             "conflict": bool(current),
             "previous_value": current.display_value if current else None,
-            "extraction_source": source,
+            "extraction_source": item["extraction_source"],
         })
     return result, source

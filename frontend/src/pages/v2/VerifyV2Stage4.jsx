@@ -12,6 +12,7 @@ const CAPABILITIES = [
   ['new_product_purchase_atomic', '新产品草稿与购买同事务'],
   ['product_merge_proposal', '重复产品合并经统一 Proposal'],
   ['knowledge_status_visible', 'draft / active 与资料待补充状态可见'],
+  ['deepseek_structured_candidate_path', 'DeepSeek 结构化候选代码路径'],
 ]
 
 export default function VerifyV2Stage4() {
@@ -82,6 +83,14 @@ export default function VerifyV2Stage4() {
             </div>
           ))}
           <div className="v1-row"><span className="k">RAG / 知识 Embedding 索引</span><span className="v ok">未建设（阶段5边界）</span></div>
+        </div>
+
+        <div className="v1-panel">
+          <h2>模型验证边界</h2>
+          <div className="v1-row"><span className="k">后端模型配置</span><span className="v">{data ? (data.status.model_validation?.configured ? '已配置（不显示 Key）' : '未配置') : '加载中'}</span></div>
+          <div className="v1-row"><span className="k">V2 主对话代码路径</span><span className="v ok">已接通 DeepSeekAdapter</span></div>
+          <div className="v1-row"><span className="k">自动测试</span><span className="v ok">MockModel 已通过</span></div>
+          <div className="v1-row"><span className="k">真实付费 DeepSeek 调用</span><span className="v pending">未执行，等待授权</span></div>
         </div>
 
         <div className="v1-panel">

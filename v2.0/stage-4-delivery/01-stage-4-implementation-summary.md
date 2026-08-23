@@ -17,6 +17,9 @@
 - 新产品草稿、产品购买和同轮客户事实在一个数据库事务中提交；
 - 产品新建和合并均先生成 Proposal，确认前不改变权威数据；
 - 手动表单、文本和语音转写共用同一 Proposal、事务、幂等和冲突校验链路；
+- V2 主对话在后端已配置 `DEEPSEEK_API_KEY` 时会构造 `DeepSeekAdapter`，一次生成无 ID 的意图、客户称呼、客户事实、产品名/品牌/规格和澄清问题候选；
+- 模型结果必须通过禁止额外字段的严格 Schema、枚举、长度、类型、置信度、原文证据和提示注入校验；任何失败整体丢弃并降级；
+- 模型无权产生 `customer_id`、`product_id` 或直接写库；实体 ID 仍只由 tenant/owner 限定的后端权威检索生成；
 - 客户档案和管理页从后端权威读模型展示当前事实、产品和关联购买；
 - `/verify/v2-stage-4` 提供只读匹配验证、实体状态和范围边界。
 
@@ -32,6 +35,7 @@ Agent 只生成候选和 Proposal。事实、产品、别名、产品购买与�
 
 - `backend/alembic/versions/0017_stage4_entity_hardening.py`
 - `backend/app/application/fact_extraction_service.py`
+- `backend/app/application/stage4_model_service.py`
 - `backend/app/application/product_resolution_service.py`
 - `backend/app/application/stage4_entity_service.py`
 - `backend/app/application/confirmation_service.py`

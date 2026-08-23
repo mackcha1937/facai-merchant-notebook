@@ -7,6 +7,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.application import product_resolution_service, stage4_entity_service
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.rbac import require_owner
 from app.infrastructure.models import CustomerFact, LedgerEntry, Product, ProductAlias
@@ -70,6 +71,7 @@ def resolve_proposal_product(
 @router.get("/v2-stage4/status")
 def stage4_status(db: Session = Depends(get_db)):
     require_owner()
+    settings = get_settings()
     migration = db.execute(text("SELECT version_num FROM alembic_version")).scalar_one_or_none()
     counts = {
         "customer_facts": db.scalar(select(func.count(CustomerFact.id))) or 0,
@@ -98,8 +100,16 @@ def stage4_status(db: Session = Depends(get_db)):
             "new_product_purchase_atomic": True,
             "product_merge_proposal": True,
             "knowledge_status_visible": True,
+            "deepseek_structured_candidate_path": True,
             "rag_built": False,
             "knowledge_embedding_index_built": False,
+        },
+        "model_validation": {
+            "configured": settings.is_model_configured,
+            "adapter": "DeepSeekAdapter",
+            "runtime_path": "connected",
+            "automatic_test": "mock_passed",
+            "paid_call": "not_executed_waiting_authorization",
         },
         "test_results": test_results,
     }
