@@ -579,7 +579,7 @@ class MessageDraft(Base):
     copied_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     data_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=True)
 
 
 class FollowUpFeedback(Base):

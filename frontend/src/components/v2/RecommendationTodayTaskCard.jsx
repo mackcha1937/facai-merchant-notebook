@@ -15,6 +15,7 @@ const ACTIONS = [
 
 function evidenceLabel(item) {
   if (item.kind === 'transaction') return `账本购买 · ${item.occurred_on} · ${item.quantity} 件`
+  if (item.kind === 'service_transaction') return `账本服务 · ${item.occurred_on}`
   if (item.kind === 'package_balance') return `权威余量 ${item.remaining_count} 次 · ${item.last_consumed_at || item.evidence_date}`
   if (item.document_id) return `资料 #${item.document_id} · v${item.knowledge_version} · ${item.source?.name || '已确认来源'}`
   return '结构化证据'
@@ -29,6 +30,7 @@ export default function RecommendationTodayTaskCard({
   const listRef = useRef(null)
   const [openId, setOpenId] = useState(null)
   const [feedback, setFeedback] = useState({})
+  const [snoozeTimes, setSnoozeTimes] = useState({})
   const [notice, setNotice] = useState('')
 
   useEffect(() => {
@@ -41,7 +43,10 @@ export default function RecommendationTodayTaskCard({
   }
   const run = async (callback, success) => {
     setNotice('')
-    try { await callback(); setNotice(success) } catch (error) { setNotice(error.message) }
+    try {
+      const result = await callback()
+      setNotice(typeof success === 'function' ? success(result) : success)
+    } catch (error) { setNotice(error.message) }
   }
 
   return <div className="v2-block v2-today" data-testid="today-task-card">
@@ -76,8 +81,17 @@ export default function RecommendationTodayTaskCard({
                 <button className="v2-btn secondary" onClick={() => run(() => onRewrite?.(task, 'no_purchase'), '已生成不提购买版本')}>不提购买</button>
               </div></div>}
               {(recommendation.message_drafts || []).filter((item) => item.variant !== 'standard').map((draft) => <div className="v2-message-draft compact" key={draft.id}><small>{draft.variant === 'shorter' ? '短一点' : '不提购买'}</small><p>{draft.content}</p><button className="v2-btn secondary" onClick={() => run(() => onCopy?.(task, draft), '已复制；未发送')}>复制此版本</button></div>)}
-              <label className="v2-feedback-label">反馈原文（可选）<textarea value={feedback[task.id] || ''} onChange={(event) => setFeedback((value) => ({ ...value, [task.id]: event.target.value }))} placeholder="例如：客户说偏好清爽，10天后再问。提取内容仍需确认。" /></label>
-              <div className="v2-action-row v2-feedback-actions">{ACTIONS.map(([action, labelText]) => <button key={action} className="v2-btn secondary" onClick={() => run(() => onRecommendationAction?.(task, action, feedback[task.id] || ''), action === 'snoozed' ? '已设置稍后处理' : `已记录：${labelText}`)}>{labelText}</button>)}</div>
+              <label className="v2-feedback-label">反馈原文（AI不准确时必填）<textarea value={feedback[task.id] || ''} onChange={(event) => setFeedback((value) => ({ ...value, [task.id]: event.target.value }))} placeholder="例如：客户说偏好清爽，10天后再问。提取内容仍需确认。" /></label>
+              <label className="v2-feedback-label">稍后处理时间（不填则明天10:00；原文含日期时以确认卡为准）<input type="datetime-local" value={snoozeTimes[task.id] || ''} onChange={(event) => setSnoozeTimes((value) => ({ ...value, [task.id]: event.target.value }))} /></label>
+              <div className="v2-action-row v2-feedback-actions">{ACTIONS.map(([action, labelText]) => <button key={action} className="v2-btn secondary" onClick={() => run(
+                () => onRecommendationAction?.(task, action, feedback[task.id] || '', snoozeTimes[task.id] || ''),
+                (result) => result?.proposal ? '已生成待确认事项，确认前不写入提醒或客户事实' : action === 'snoozed' ? '已设置稍后处理' : `已记录：${labelText}`,
+              )}>{labelText}</button>)}</div>
+              <button className="v2-btn secondary" onClick={() => run(() => {
+                const text = (feedback[task.id] || '').trim()
+                if (!text) throw new Error('请先填写AI不准确的具体说明')
+                return onRecommendationAction?.(task, 'ai_inaccurate', text, '')
+              }, '已记录：AI不准确；不会自动训练或改变事项状态')}>AI不准确</button>
               <p className="v2-hint">系统未建设微信、短信或其他发送能力。反馈状态更新不调用模型；从原文提取的事实或日期会先生成确认卡。</p>
             </div>}
           </div>

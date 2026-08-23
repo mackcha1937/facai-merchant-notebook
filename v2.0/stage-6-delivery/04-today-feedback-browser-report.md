@@ -18,3 +18,11 @@
 - 浏览器只执行 GET 和两次单条 `read`；未点击复制、改写、反馈、确认或任何业务处理。
 
 浏览器结束时隔离库：CustomerFact 0、FollowUpFeedback 0、AgentProposal 0；原有 3 条虚构账本记录未变化。仅新增 2 条逐条阅读审计，Recommendation 状态为 2 new / 2 viewed，`integrity_check=ok`、foreign key check 无错误。
+
+## 独立整改复验
+
+- 隔离库重新生成4条虚构Recommendation，DeepSeek/ChatModel、外部Embedding和消息发送仍为0。
+- 桌面1233×750：日期时间输入与“AI不准确”入口各1个；页面 `scrollWidth == clientWidth`；规则参数与发送控件均为0。
+- 输入“10天后再问”点击“稍后”后，页面显示“已生成待确认事项”；Pending新增1条，原Recommendation保持 `viewed` 且 `snoozed_until=null`。
+- 手机390×844：日期输入、“AI不准确”、待确认提示均可见；`scrollWidth == clientWidth == 390`，发送控件0。
+- 验收结束后隔离Chromium、8002服务及 `/private/tmp` 隔离数据库均已关闭/删除；正式库未写入虚构数据。

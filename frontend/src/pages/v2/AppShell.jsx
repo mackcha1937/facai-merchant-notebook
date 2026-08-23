@@ -21,6 +21,16 @@ import {
 
 const makeCtx = (viewType, extra = {}) => ({ ...createViewContext({ viewType }), ...extra })
 const requestKey = (prefix) => `${prefix}-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`}`
+const SNOOZE_DATE_HINT = /(?:20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?|\d{1,3}\s*天后)/
+
+export function resolveRecommendationSnooze(action, feedbackText = '', selectedLocalTime = '') {
+  if (action !== 'snoozed') return null
+  if (SNOOZE_DATE_HINT.test(feedbackText)) return null
+  if (selectedLocalTime) return new Date(selectedLocalTime).toISOString()
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
+  tomorrow.setHours(10, 0, 0, 0)
+  return tomorrow.toISOString()
+}
 
 export default function AppShell({ initialView = 'chat' }) {
   const stackRef = useRef(null)
@@ -249,19 +259,23 @@ export default function AppShell({ initialView = 'chat' }) {
   }, [refreshRecommendationTasks, todayTasks])
   const handleTaskHandle = useCallback(() => goChat(), [goChat])
 
-  const handleRecommendationAction = useCallback(async (task, action, feedbackText = '') => {
-    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
-    tomorrow.setHours(10, 0, 0, 0)
-    await api.submitRecommendationFeedback(task.recommendation_id, {
+  const handleRecommendationAction = useCallback(async (task, action, feedbackText = '', selectedLocalTime = '') => {
+    const result = await api.submitRecommendationFeedback(task.recommendation_id, {
       action,
       feedback_text: feedbackText || null,
-      snoozed_until: action === 'snoozed' ? tomorrow.toISOString() : null,
+      snoozed_until: resolveRecommendationSnooze(action, feedbackText, selectedLocalTime),
       data_version: task.data_version,
       idempotency_key: requestKey(`recommendation-${action}`),
       request_id: requestKey(`feedback-${action}`).slice(0, 64),
     })
     await refreshRecommendationTasks()
-  }, [refreshRecommendationTasks])
+    if (result.proposal) {
+      setChatRefreshToken((value) => value + 1)
+      const pending = await api.getPendingActions()
+      mapPending(pending.items || [])
+    }
+    return result
+  }, [mapPending, refreshRecommendationTasks])
 
   const handleRecommendationRewrite = useCallback(async (task, variant) => {
     await api.rewriteRecommendationMessage(task.recommendation_id, {

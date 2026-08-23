@@ -1,7 +1,7 @@
 {
   "status": "通过",
-  "backend": "273 passed（含阶段1—5全回归与阶段6 SQL推荐/硬排除/RAG降级/话术/反馈/Migration 验收）",
-  "frontend": "45 passed（9个测试文件）",
+  "backend": "276 passed（含阶段1—5全回归与阶段6 SQL推荐/硬排除/一次性服务/RAG降级/话术/反馈/Migration 验收）",
+  "frontend": "47 passed（9个测试文件）",
   "build": "Vite生产构建通过（79 modules transformed）",
   "migration_cycle": "正式库0018→0019；克隆库0019→0018→0019，通过",
   "integrity": "正式库与克隆三个检查点 integrity_check=ok，foreign_key_check无错误",
@@ -10,8 +10,8 @@
     "after_hash": "6e2e8fa5950779681cd725ce23afb46131a76dac7ce2ee6a4a8910494d25c115",
     "formal_counts": "customers4 / services5 / packages3 / ledger4 / facts0 / products1 / knowledge0 / rules0 / recommendations0 / drafts0 / feedback0 / audits0"
   },
-  "browser": "Chromium桌面1440×1000与手机390×844通过；Top3=3位客户，逐条打开后unread 3→2→1、unresolved保持3；详情证据/复制/有限改写可见，发送控件0，双端无横向溢出",
-  "security": "硬排除先评分；未确认事实零采用；停用/撤回/跨店零泄漏；RAG失败仅结构化证据；话术无医疗承诺/秘密/注入；反馈确认前事实/账本/提醒零权威写入",
+  "browser": "Chromium原验收桌面1440×1000与手机390×844通过；独立整改复验桌面1233×750与手机390×844通过，日期输入和AI不准确入口可见，10天后稍后仅生成Pending且提醒为空，发送控件0，双端无横向溢出",
+  "security": "硬排除先评分；数据库score归一化0—1且越界规则拒绝；一次性服务与套餐融合去重；未确认事实零采用；停用/撤回/跨店零泄漏；RAG失败仅结构化证据；无套餐话术不虚构余量；AI不准确不改变处理状态；反馈确认前事实/账本/提醒零权威写入",
   "external_calls": "DeepSeek/ChatModel 0；外部Embedding 0；模型下载0；外部消息发送0",
   "environment": "ENABLE_V2_REAL_MODEL保持false；真实.env未修改；正式库未种虚构规则或推荐",
   "sensitive_scan": "通过：Git跟踪与新增文件无真实Key、Bearer凭据或长令牌赋值",

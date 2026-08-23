@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { api } from '../api.js'
 import RecommendationTodayTaskCard from '../components/v2/RecommendationTodayTaskCard.jsx'
+import { resolveRecommendationSnooze } from '../pages/v2/AppShell.jsx'
 import VerifyV2Stage6 from '../pages/v2/VerifyV2Stage6.jsx'
 
 const recommendation = {
@@ -46,7 +47,7 @@ describe('阶段6今日事项交互', () => {
     expect(onAction).not.toHaveBeenCalled()
     fireEvent.change(screen.getByPlaceholderText(/客户说偏好清爽/), { target: { value: '客户说偏好清爽，10天后再问' } })
     fireEvent.click(screen.getByText('已联系'))
-    await waitFor(() => expect(onAction).toHaveBeenCalledWith(task, 'contacted', '客户说偏好清爽，10天后再问'))
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith(task, 'contacted', '客户说偏好清爽，10天后再问', ''))
   })
 
   it('提供确定性短一点与不提购买改写，不出现规则权重或发送控件', () => {
@@ -58,6 +59,28 @@ describe('阶段6今日事项交互', () => {
     expect(onRewrite).toHaveBeenCalledWith(task, 'shorter')
     expect(onRewrite).toHaveBeenCalledWith(task, 'no_purchase')
     expect(screen.queryByText(/overdue_per_day|cooldown_days|API Key/)).not.toBeInTheDocument()
+  })
+
+  it('含日期的稍后反馈只进入待确认，并要求AI不准确说明', async () => {
+    const onAction = vi.fn().mockResolvedValue({ proposal: { id: 99 } })
+    render(<RecommendationTodayTaskCard tasks={[task]} groupLabels={{ suggested_follow_up: '建议跟进' }} onRecommendationAction={onAction} />)
+    fireEvent.click(screen.getByLabelText(/虚构顾客星澜/))
+    fireEvent.change(screen.getByPlaceholderText(/客户说偏好清爽/), { target: { value: '10天后再问' } })
+    fireEvent.click(screen.getByText('稍后'))
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith(task, 'snoozed', '10天后再问', ''))
+    expect(await screen.findByText(/已生成待确认事项/)).toBeInTheDocument()
+
+    fireEvent.change(screen.getByPlaceholderText(/客户说偏好清爽/), { target: { value: '' } })
+    fireEvent.click(screen.getByText('AI不准确'))
+    expect(await screen.findByText(/请先填写AI不准确/)).toBeInTheDocument()
+    expect(onAction).toHaveBeenCalledTimes(1)
+  })
+
+  it('稍后时间解析不会用默认时间绕过原文日期确认', () => {
+    expect(resolveRecommendationSnooze('snoozed', '客户说10天后再问', '2026-08-24T10:00')).toBeNull()
+    expect(resolveRecommendationSnooze('snoozed', '请在2026-09-03联系', '')).toBeNull()
+    expect(resolveRecommendationSnooze('contacted', '', '2026-08-24T10:00')).toBeNull()
+    expect(resolveRecommendationSnooze('snoozed', '', '2026-08-24T10:00')).toBe(new Date('2026-08-24T10:00').toISOString())
   })
 })
 

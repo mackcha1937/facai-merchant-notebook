@@ -759,6 +759,17 @@
   resize: vertical;
 }
 
+.v2-feedback-label input[type="datetime-local"] {
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 5px;
+  padding: 8px;
+  border: 1px solid var(--c-border);
+  border-radius: 9px;
+  color: var(--c-text-primary);
+  background: var(--c-surface);
+}
+
 .v2-feedback-actions { margin-top: 7px; }
 
 .v2-inline-notice {

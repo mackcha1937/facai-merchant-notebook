@@ -2,8 +2,8 @@
 
 ## 最终自动测试
 
-- 后端：273 passed；唯一警告为既有 Starlette TestClient/httpx 弃用提示。
-- 前端：45 passed / 9 test files。
+- 后端：276 passed；唯一警告为既有 Starlette TestClient/httpx 弃用提示。
+- 前端：47 passed / 9 test files。
 - 生产构建：Vite 通过，79 modules transformed。
 
 阶段6定向覆盖包括：
@@ -16,8 +16,9 @@
 - 未确认事实零采用、停用/撤回/缺失知识和跨店零泄漏；
 - 拒绝后零再推，明确解除后恢复；snooze 到期、expired、data version 冲突和动作幂等；
 - 证据快照版本追溯；开发包 recommendation JSON Schema 自动校验；
+- 数据库评分0—1、原始分breakdown、优先级/总分越界拒绝；一次性服务回访窗口、停用/缺知识/跨店门禁和无虚构余量话术；
 - 安全模板、“短一点”“不提购买”、复制不等于联系、外发能力为0；
-- 反馈提取确认前 CustomerFact/账本/提醒零权威写入，确认后事务写入；
+- “稍后”原文日期不被默认时间绕过，待确认卡刷新；AI不准确必须说明且不改变推荐处理状态；反馈提取确认前 CustomerFact/账本/提醒零权威写入，确认后事务写入；
 - `0019→0018→0019`、create_all预建空表兼容和阶段1～5全回归。
 
 ## 安全边界

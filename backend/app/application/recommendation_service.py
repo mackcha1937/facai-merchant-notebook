@@ -175,7 +175,10 @@ def _feedback_refusal_active(db: Session, customer_id: int, trigger: str, subjec
         context = _load(row.anonymous_context_json, {})
         if context.get("trigger_type") not in (None, trigger):
             continue
-        if context.get("subject_id") not in (None, subject_id):
+        subject_ref = context.get("subject_ref")
+        if subject_ref is not None and subject_ref != f"{context.get('subject_type', '')[:1]}-{subject_id}":
+            continue
+        if subject_ref is None and context.get("subject_id") not in (None, subject_id):
             continue
         return row.action_type == "do_not_recommend"
     return False
@@ -253,9 +256,14 @@ def _score(rule: RecommendationRule, *, overdue_days: int, evidence_count: int, 
     overdue_weight = float(config.get("overdue_per_day", 0.5))
     evidence_weight = float(config.get("evidence", 8))
     balance_weight = float(config.get("low_balance", 12)) if remaining is not None and remaining <= 2 else 0.0
+    if isinstance(rule.priority, bool) or not isinstance(rule.priority, int) or not 0 <= rule.priority <= 30:
+        raise DomainError(f"推荐规则 {rule.id} 优先级无效")
     for value in (base, overdue_weight, evidence_weight, balance_weight):
-        if not -100 <= value <= 100:
+        if not 0 <= value <= 100:
             raise DomainError(f"推荐规则 {rule.id} 评分参数无效")
+    maximum_raw = base + 30 + evidence_weight + balance_weight + rule.priority
+    if maximum_raw <= 0 or maximum_raw > 200:
+        raise DomainError(f"推荐规则 {rule.id} 评分总边界无效")
     breakdown = {
         "base": round(base, 4),
         "overdue": round(min(max(overdue_days, 0) * overdue_weight, 30), 4),
@@ -263,7 +271,10 @@ def _score(rule: RecommendationRule, *, overdue_days: int, evidence_count: int, 
         "low_balance": round(balance_weight, 4),
         "rule_priority": rule.priority,
     }
-    return round(sum(breakdown.values()), 4), breakdown
+    raw_score = round(sum(breakdown.values()), 4)
+    breakdown["raw_score"] = raw_score
+    breakdown["maximum_raw_score"] = round(maximum_raw, 4)
+    return round(raw_score / maximum_raw, 6), breakdown
 
 
 def _safe_message(kind: str, *, customer: str, subject: str, remaining: int | None = None, variant: str = "standard") -> str:
@@ -284,8 +295,10 @@ def _safe_message(kind: str, *, customer: str, subject: str, remaining: int | No
         shorter = f"{customer}，最近{subject}用着还顺手吗？需要时和我说就好。"
         no_purchase = f"{customer}，想问问您最近{subject}用着感觉怎么样？有需要时再联系我就好。"
     elif kind == "service_follow_up":
-        standard = f"{customer}，最近感觉怎么样？您这边{subject}还有{remaining}次，如果想安排时间，我再帮您看看。"
-        shorter = f"{customer}，最近怎么样？{subject}还有{remaining}次，需要安排时和我说。"
+        balance = f"您这边{subject}还有{remaining}次，" if remaining is not None and remaining > 0 else ""
+        shorter_balance = f"{subject}还有{remaining}次，" if remaining is not None and remaining > 0 else ""
+        standard = f"{customer}，最近感觉怎么样？{balance}如果想安排时间，我再帮您看看。"
+        shorter = f"{customer}，最近怎么样？{shorter_balance}需要安排时和我说。"
         no_purchase = f"{customer}，想问问最近感觉怎么样？如果想安排{subject}，再联系我就好。"
     else:
         standard = f"{customer}，想问问最近{subject}的体验怎么样？现有次数不多了，您有需要时我们再聊。"
@@ -374,6 +387,18 @@ def _service_rows(db: Session):
     return packages, used
 
 
+def _one_time_service_rows(db: Session):
+    """读取当前租户一次性服务事实；只作为服务回访候选，不参与套餐续费。"""
+    return db.execute(select(Customer, Service, LedgerEntry).join(
+        LedgerEntry, LedgerEntry.customer_id == Customer.id,
+    ).join(Service, Service.id == LedgerEntry.service_id).where(
+        Customer.tenant_id == get_current_tenant_id(), Customer.deleted_at.is_(None),
+        Service.tenant_id == get_current_tenant_id(), Service.deleted_at.is_(None), Service.status == "active",
+        LedgerEntry.tenant_id == get_current_tenant_id(),
+        LedgerEntry.entry_type == "one_time_service", LedgerEntry.deleted_at.is_(None),
+    ).order_by(Customer.id, Service.id, LedgerEntry.occurred_on.desc(), LedgerEntry.id.desc())).all()
+
+
 def _last_consumption(db: Session, customer_id: int, service_id: int) -> LedgerEntry | None:
     return db.scalar(select(LedgerEntry).where(
         LedgerEntry.tenant_id == get_current_tenant_id(),
@@ -394,12 +419,18 @@ def _service_candidates(db: Session, rule: RecommendationRule, target_date: date
             excluded.append({"customer_id": customer.id, "subject_id": service.id, "reason": "negative_balance_conflict"})
             continue
         item = grouped.setdefault((customer.id, service.id), {
-            "customer": customer, "service": service, "remaining": 0,
+            "customer": customer, "service": service, "remaining": 0, "one_time_entry": None,
         })
         item["remaining"] += remaining
+    for customer, service, entry in _one_time_service_rows(db):
+        item = grouped.setdefault((customer.id, service.id), {
+            "customer": customer, "service": service, "remaining": None, "one_time_entry": None,
+        })
+        if item["one_time_entry"] is None:
+            item["one_time_entry"] = entry
     for item in grouped.values():
         customer, service, remaining = item["customer"], item["service"], item["remaining"]
-        if remaining <= 0:
+        if remaining is not None and remaining <= 0 and item["one_time_entry"] is None:
             continue
         entry = _last_consumption(db, customer.id, service.id)
         occurred = _parse_date(entry.occurred_on) if entry else None
@@ -423,11 +454,20 @@ def _service_candidates(db: Session, rule: RecommendationRule, target_date: date
         rag, degraded, degraded_reason = _rag_snapshot(
             db, entity_type="service", entity_id=service.id, query=service.name,
         )
-        structured = [{
-            "kind": "package_balance", "remaining_count": remaining,
-            "last_consumed_at": occurred.isoformat(), "ledger_entry_id": entry.id,
-            "source": "tenant_sql",
-        }]
+        if remaining is not None and remaining > 0:
+            structured = [{
+                "kind": "package_balance", "remaining_count": remaining,
+                "last_consumed_at": occurred.isoformat(), "ledger_entry_id": entry.id,
+                "source": "tenant_sql",
+            }]
+            reason = f"距上次服务已 {elapsed} 天，当前权威余量 {remaining} 次"
+        else:
+            remaining = None
+            structured = [{
+                "kind": "service_transaction", "entry_id": entry.id,
+                "occurred_on": occurred.isoformat(), "source": "tenant_sql",
+            }]
+            reason = f"距最近一次服务已 {elapsed} 天，达到规则 {threshold} 天"
         score, breakdown = _score(
             rule, overdue_days=elapsed - threshold, evidence_count=len(structured), remaining=remaining,
         )
@@ -435,7 +475,7 @@ def _service_candidates(db: Session, rule: RecommendationRule, target_date: date
             "generation_key": generation_key, "customer": customer, "entity_type": "service",
             "entity_id": service.id, "subject_name": service.name, "trigger": rule.rule_type,
             "score": score, "breakdown": breakdown,
-            "reason": f"距上次服务已 {elapsed} 天，当前权威余量 {remaining} 次",
+            "reason": reason,
             "suggested_action": "先关心近况，再询问是否需要安排时间",
             "evidence": structured + rag, "knowledge_versions": [
                 {"document_id": value["document_id"], "knowledge_version": value["knowledge_version"]} for value in rag
@@ -583,6 +623,8 @@ def refresh(db: Session, data) -> dict:
     rules = _active_rules(db)
     created, unchanged, excluded = [], [], []
     for rule in rules:
+        # 仅验证配置边界；真正的候选评分仍严格发生在每个候选通过硬排除之后。
+        _score(rule, overdue_days=0, evidence_count=0, remaining=0)
         if rule.rule_type == "product_repurchase":
             candidates, rejected = _product_candidates(db, rule, target, now)
         elif rule.rule_type == "service_follow_up":
@@ -661,9 +703,12 @@ def _view(db: Session, row: Recommendation) -> dict:
 def _contract_view(row: Recommendation, owner_script: str) -> dict:
     evidence = []
     for index, item in enumerate(_load(row.evidence_snapshot, [])[:9]):
-        if item.get("kind") == "transaction":
+        if item.get("kind") in {"transaction", "service_transaction"}:
             source_type, source_id = "transaction", f"ledger-{item.get('entry_id')}"
-            excerpt = f"{item.get('occurred_on')} 购买 {item.get('quantity')} 件"
+            if item.get("kind") == "service_transaction":
+                excerpt = f"{item.get('occurred_on')} 完成一次服务"
+            else:
+                excerpt = f"{item.get('occurred_on')} 购买 {item.get('quantity')} 件"
         elif item.get("kind") == "package_balance":
             source_type = "transaction"
             source_id = f"package-{item.get('package_id') or item.get('ledger_entry_id')}"
@@ -694,7 +739,7 @@ def _contract_view(row: Recommendation, owner_script: str) -> dict:
         "suggested_action": (row.suggested_action or "")[:200],
         "owner_script": owner_script[:500], "evidence": evidence,
         "risk_flags": _load(row.risk_flags_json, [])[:20],
-        "score": round(min(max(float(row.score or 0) / 100, 0), 1), 4),
+        "score": round(min(max(float(row.score or 0), 0), 1), 6),
         "generated_at": (row.generated_at or row.created_at).replace(tzinfo=timezone.utc).isoformat(),
         "expires_at": (row.expires_at or row.created_at).replace(tzinfo=timezone.utc).isoformat(),
         "status": contract_status,
@@ -787,7 +832,8 @@ def _feedback_context(row: Recommendation) -> dict:
     return {
         "customer_ref": f"c-{row.customer_id}", "recommendation_ref": f"r-{row.id}",
         "trigger_type": row.trigger_type, "subject_type": row.subject_type,
-        "subject_id": row.subject_id, "rule_version": row.rule_version,
+        "subject_ref": f"{row.subject_type[:1]}-{row.subject_id}",
+        "rule_version": row.rule_version, "policy_version": row.policy_version,
         "evidence_checksum": _checksum(_load(row.evidence_snapshot, [])),
     }
 

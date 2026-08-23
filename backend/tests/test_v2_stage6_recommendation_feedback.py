@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
-from jsonschema import validate
+from jsonschema import Draft202012Validator, FormatChecker
 from sqlalchemy import func, select
 
 from app.application import recommendation_service, stage3_proposal_service
@@ -28,6 +28,7 @@ RECOMMENDATION_SCHEMA = json.loads((
     Path(__file__).resolve().parents[2] / "v2.0" / "facai-v2-development-package" /
     "contracts" / "recommendation.schema.json"
 ).read_text(encoding="utf-8"))
+RECOMMENDATION_VALIDATOR = Draft202012Validator(RECOMMENDATION_SCHEMA, format_checker=FormatChecker())
 
 
 @pytest.fixture(autouse=True)
@@ -113,6 +114,20 @@ def add_service_case(db, name, customer_name, *, remaining=2, consumed_on="2026-
     return customer, service, package
 
 
+def add_one_time_service_case(db, name, customer_name, *, occurred_on="2026-07-01", tenant=1, knowledge=True, status="active"):
+    customer = Customer(tenant_id=tenant, display_name=customer_name)
+    service = Service(tenant_id=tenant, name=name, status=status)
+    db.add_all([customer, service]); db.flush()
+    db.add(LedgerEntry(
+        tenant_id=tenant, customer_id=customer.id, entry_type="one_time_service",
+        service_id=service.id, quantity=1, occurred_on=occurred_on,
+        original_input="隔离虚构一次性服务",
+    ))
+    db.commit()
+    if knowledge: add_knowledge(db, service, tenant=tenant)
+    return customer, service
+
+
 def run_refresh(db, target=TARGET):
     return recommendation_service.refresh(db, RecommendationRefreshRequest(
         target_date=target, request_id=f"refresh-{target}",
@@ -145,9 +160,61 @@ def test_three_sql_candidate_types_top3_unique_customer_and_explainable_score(db
     assert sum(item["customer"]["id"] == c2.id for item in all_items["items"]) == 1
     assert c1.id and product.id and service.id
     for item in top["items"]:
-        validate(item["contract"], RECOMMENDATION_SCHEMA)
+        RECOMMENDATION_VALIDATOR.validate(item["contract"])
+        assert 0 <= item["score"] <= 1
+        assert item["contract"]["score"] == item["score"]
+        assert item["score_breakdown"]["raw_score"] >= 0
     assert top["ui_block"]["type"] == "today_tasks"
     assert top["ui_block"]["unread_count"] == top["unread_count"]
+
+
+def test_score_is_normalized_and_rejects_priority_or_total_boundary(db_session):
+    rules = add_rules(db_session)
+    score, breakdown = recommendation_service._score(
+        rules[0], overdue_days=999, evidence_count=1,
+    )
+    assert 0 <= score <= 1
+    assert breakdown["raw_score"] <= breakdown["maximum_raw_score"]
+    rules[0].priority = 31
+    with pytest.raises(DomainError, match="优先级"):
+        recommendation_service._score(rules[0], overdue_days=1, evidence_count=1)
+    rules[0].priority = 30
+    rules[0].score_config_json = json.dumps({"base": 100, "overdue_per_day": 1, "evidence": 100})
+    with pytest.raises(DomainError, match="总边界"):
+        recommendation_service._score(rules[0], overdue_days=1, evidence_count=1)
+
+
+def test_one_time_service_followup_window_gates_tenant_and_safe_message(db_session):
+    add_rules(db_session)
+    eligible, eligible_service = add_one_time_service_case(
+        db_session, "一次性肩颈护理", "虚构一次服务顾客", occurred_on="2026-07-01",
+    )
+    add_one_time_service_case(
+        db_session, "近期护理", "虚构近期顾客", occurred_on="2026-08-15",
+    )
+    inactive, _ = add_one_time_service_case(
+        db_session, "停用护理", "虚构停用顾客", occurred_on="2026-07-01", status="inactive",
+    )
+    no_knowledge, _ = add_one_time_service_case(
+        db_session, "无知识护理", "虚构无知识顾客", occurred_on="2026-07-01", knowledge=False,
+    )
+    add_one_time_service_case(
+        db_session, "跨店护理", "虚构跨店顾客", occurred_on="2026-07-01", tenant=2,
+    )
+
+    result = run_refresh(db_session)
+    rows = list(db_session.scalars(select(Recommendation).where(
+        Recommendation.trigger_type == "service_follow_up",
+    )).all())
+    assert [row.customer_id for row in rows] == [eligible.id]
+    row = rows[0]
+    evidence = json.loads(row.evidence_snapshot)
+    assert evidence[0]["kind"] == "service_transaction"
+    assert row.subject_id == eligible_service.id
+    draft = db_session.scalar(select(MessageDraft).where(MessageDraft.recommendation_id == row.id))
+    assert "None" not in draft.content and "余量" not in draft.content and "还有0次" not in draft.content
+    assert not db_session.scalar(select(Recommendation.id).where(Recommendation.customer_id.in_((inactive.id, no_knowledge.id))))
+    assert any(item["reason"] == "current_confirmed_knowledge_missing" for item in result["excluded"])
 
 
 def test_no_active_rules_means_no_seed_no_recommendation_and_zero_external_calls(db_session):
@@ -449,7 +516,12 @@ def test_ai_inaccurate_feedback_uses_anonymous_refs_and_rejects_secret_or_prompt
     context = json.loads(feedback.anonymous_context_json)
     assert context["customer_ref"] == f"c-{customer.id}"
     assert context["recommendation_ref"] == f"r-{row.id}"
+    assert context["subject_ref"].startswith("p-")
+    assert "subject_id" not in context
+    assert context["policy_version"] == "stage6-sql-v1"
     assert "虚构反馈安全顾客" not in feedback.anonymous_context_json
+    db_session.refresh(row)
+    assert row.status == "new" and row.handled_at is None
     with pytest.raises(DomainError):
         recommendation_service.feedback(db_session, row.id, RecommendationFeedbackRequest(
             action="ai_inaccurate", feedback_text="API Key: redacted-test-value",
@@ -457,6 +529,22 @@ def test_ai_inaccurate_feedback_uses_anonymous_refs_and_rejects_secret_or_prompt
             request_id="ai-secret-request-0001",
         ))
     assert not db_session.scalar(select(FollowUpFeedback.id).where(FollowUpFeedback.idempotency_key == "ai-secret-reject-0001"))
+
+
+def test_ai_inaccurate_feedback_api_keeps_recommendation_unhandled(client, db_session):
+    add_rules(db_session)
+    customer, _ = add_product_case(db_session, "API反馈面霜", "虚构API反馈顾客")
+    run_refresh(db_session)
+    row = db_session.scalar(select(Recommendation).where(Recommendation.customer_id == customer.id))
+    response = client.post(f"/api/owner/recommendations/{row.id}/feedback", json={
+        "action": "ai_inaccurate", "feedback_text": "推荐理由与账本日期不一致",
+        "data_version": row.data_version, "idempotency_key": "api-ai-inaccurate-0001",
+        "request_id": "api-ai-inaccurate-request-0001", "snoozed_until": None,
+    })
+    assert response.status_code == 200
+    assert response.json()["external_calls"] == 0
+    db_session.refresh(row)
+    assert row.status == "new" and row.handled_at is None
 
 
 def test_owner_cannot_read_admin_rule_config_and_no_rule_write_route(client):
