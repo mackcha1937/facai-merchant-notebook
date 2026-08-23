@@ -56,6 +56,9 @@ class ConfirmAction(BaseModel):
     knowledge_checksum: str | None = None
     current_version_id: int | None = None
     reason: str | None = None
+    recommendation_id: int | None = None
+    feedback_id: int | None = None
+    snoozed_until: str | None = None
 
 
 class ConfirmRequest(BaseModel):

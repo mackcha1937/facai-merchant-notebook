@@ -11,6 +11,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    Index,
     String,
     Text,
     UniqueConstraint,
@@ -510,9 +511,18 @@ class RecommendationRule(Base):
     conditions_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     hard_exclusions_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     score_config_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    policy_version: Mapped[str] = mapped_column(String(50), default="stage6-sql-v1", nullable=False)
+    cooldown_days: Mapped[int] = mapped_column(Integer, default=7, nullable=False)
+    priority: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "rule_type", "version", name="uq_recommendation_rules_tenant_type_version"),
+    )
 
 
 class Recommendation(Base):
@@ -520,23 +530,41 @@ class Recommendation(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     tenant_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    owner_id: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     customer_id: Mapped[int] = mapped_column(Integer, nullable=False)
     subject_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
     subject_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     trigger_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    rule_id: Mapped[int | None] = mapped_column(ForeignKey("recommendation_rules.id"), nullable=True)
     rule_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    policy_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    generation_date: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    generation_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
     score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    score_breakdown_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    suggested_action: Mapped[str | None] = mapped_column(Text, nullable=True)
     evidence_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
     knowledge_versions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    degraded: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    degraded_reason: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    risk_flags_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    content_checksum: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    data_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     status: Mapped[str] = mapped_column(String(30), default="new", nullable=False)
     unread_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     handled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    contacted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     snoozed_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     generated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "generation_key", name="uq_recommendations_tenant_generation_key"),
+    )
 
 
 class MessageDraft(Base):
@@ -545,8 +573,13 @@ class MessageDraft(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     tenant_id: Mapped[int] = mapped_column(Integer, nullable=False)
     recommendation_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    variant: Mapped[str] = mapped_column(String(30), default="standard", nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    checksum: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    copied_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    data_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 
 
 class FollowUpFeedback(Base):
@@ -554,13 +587,45 @@ class FollowUpFeedback(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     tenant_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    recommendation_id: Mapped[int | None] = mapped_column(ForeignKey("recommendations.id"), nullable=True)
+    owner_id: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     customer_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    action_type: Mapped[str] = mapped_column(String(40), default="note", nullable=False)
     feedback_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     extracted_facts_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     next_reminder_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    proposal_id: Mapped[int | None] = mapped_column(ForeignKey("agent_proposals.id"), nullable=True)
+    anonymous_context_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    evidence_checksum: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    rule_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    idempotency_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    data_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     status: Mapped[str] = mapped_column(String(30), default="pending", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "idempotency_key", name="uq_follow_up_feedback_tenant_idempotency"),
+    )
+
+
+class RecommendationActionAudit(Base):
+    __tablename__ = "recommendation_action_audits"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), nullable=False)
+    owner_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    recommendation_id: Mapped[int] = mapped_column(ForeignKey("recommendations.id"), nullable=False)
+    action_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    before_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    after_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "idempotency_key", name="uq_recommendation_audits_tenant_idempotency"),
+        Index("ix_recommendation_action_audits_tenant_id_recommendation", "tenant_id", "recommendation_id", "created_at"),
+    )
 
 
 class AIConfigDraft(Base):

@@ -16,7 +16,10 @@ from app.domain.rules import (
     validate_display_name,
     validate_package_counts,
 )
-from app.infrastructure.models import Customer
+from app.infrastructure.models import Customer, FollowUpFeedback, Recommendation, RecommendationActionAudit, utcnow
+from app.core.tenant import get_current_owner_id, get_current_tenant_id
+from sqlalchemy import select
+import json
 from app.application.fact_extraction_service import ALLOWED_FACT_TYPES, normalize_fact_value
 from app.application.product_resolution_service import normalize_product_text, resolve_product
 from app.repositories import customer_facts as fact_repo
@@ -196,6 +199,29 @@ def _validate_action(db: Session, customer: Customer, action) -> dict:
 
         return validate_action(db, action)
 
+    if action_type == "snooze_recommendation":
+        recommendation = db.scalar(select(Recommendation).where(
+            Recommendation.id == action.recommendation_id,
+            Recommendation.tenant_id == get_current_tenant_id(),
+            Recommendation.owner_id == get_current_owner_id(),
+        ))
+        feedback = db.scalar(select(FollowUpFeedback).where(
+            FollowUpFeedback.id == action.feedback_id,
+            FollowUpFeedback.tenant_id == get_current_tenant_id(),
+            FollowUpFeedback.owner_id == get_current_owner_id(),
+        ))
+        try:
+            target = datetime.fromisoformat(action.snoozed_until or "")
+        except ValueError:
+            return _fail(action_type, "下次时间格式无效")
+        if recommendation is None or feedback is None or feedback.recommendation_id != recommendation.id:
+            return _fail(action_type, "推荐事项或反馈不存在")
+        if target <= utcnow():
+            return _fail(action_type, "下次时间必须晚于当前时间")
+        if feedback.status not in {"proposal_pending", "recorded"}:
+            return _fail(action_type, "反馈状态已变化")
+        return _ok(action_type, {"recommendation_id": recommendation.id, "snoozed_until": target.isoformat()})
+
     if action_type == "create_package":
         if action.service_id is None:
             return _fail("create_package", "购买套餐需要选择服务项目")
@@ -339,6 +365,8 @@ def _execute_action(db: Session, customer: Customer, action, proposal) -> dict:
         from app.application.knowledge_service import execute_action
 
         return execute_action(db, action, proposal)
+    if action_type == "snooze_recommendation":
+        return _do_snooze_recommendation(db, action, proposal)
 
     if action_type == "create_package":
         return _do_create_package(db, customer, action, proposal)
@@ -359,6 +387,43 @@ def _execute_action(db: Session, customer: Customer, action, proposal) -> dict:
     if action_type == "query_customer":
         return _do_query_customer(db, customer)
     raise DomainError(f"不支持的操作类型：{action_type}")
+
+
+def _do_snooze_recommendation(db: Session, action, proposal) -> dict:
+    recommendation = db.scalar(select(Recommendation).where(
+        Recommendation.id == action.recommendation_id,
+        Recommendation.tenant_id == get_current_tenant_id(),
+        Recommendation.owner_id == get_current_owner_id(),
+    ))
+    feedback = db.scalar(select(FollowUpFeedback).where(
+        FollowUpFeedback.id == action.feedback_id,
+        FollowUpFeedback.tenant_id == get_current_tenant_id(),
+        FollowUpFeedback.owner_id == get_current_owner_id(),
+    ))
+    if recommendation is None or feedback is None:
+        raise DomainError("推荐事项或反馈不存在")
+    target = datetime.fromisoformat(action.snoozed_until)
+    before = {"status": recommendation.status, "data_version": recommendation.data_version}
+    recommendation.status = "snoozed"
+    recommendation.snoozed_until = target
+    recommendation.handled_at = None
+    recommendation.data_version += 1
+    recommendation.updated_at = utcnow()
+    feedback.next_reminder_at = target
+    feedback.status = "confirmed"
+    feedback.updated_at = utcnow()
+    db.add(RecommendationActionAudit(
+        tenant_id=get_current_tenant_id(), owner_id=get_current_owner_id(),
+        recommendation_id=recommendation.id, action_type="snoozed_from_feedback",
+        idempotency_key=f"proposal-confirm-{proposal.id}",
+        before_json=json.dumps(before, ensure_ascii=False),
+        after_json=json.dumps({"status": recommendation.status, "data_version": recommendation.data_version}, ensure_ascii=False),
+        created_at=utcnow(),
+    ))
+    return {
+        "type": "snooze_recommendation", "message": "已确认下次时间。",
+        "recommendation_id": recommendation.id, "snoozed_until": target.isoformat(),
+    }
 
 
 def _do_create_package(db: Session, customer: Customer, action, proposal) -> dict:

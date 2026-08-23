@@ -1,6 +1,7 @@
 """Proposal 创建/确认时使用的权威对象快照。"""
 import json
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.domain.errors import DomainError
@@ -9,6 +10,8 @@ from app.repositories import packages as package_repo
 from app.repositories import services as service_repo
 from app.repositories import customer_facts as fact_repo
 from app.repositories import products as product_repo
+from app.infrastructure.models import FollowUpFeedback, Recommendation
+from app.core.tenant import get_current_owner_id, get_current_tenant_id
 
 
 def build_authority_snapshot(db: Session, parsed: dict) -> dict:
@@ -95,6 +98,26 @@ def build_authority_snapshot(db: Session, parsed: dict) -> dict:
             item["knowledge_authority"] = authority_state(
                 db, action.get("entity_type"), action.get("entity_id")
             )
+        if action.get("type") == "snooze_recommendation":
+            recommendation = db.scalar(select(Recommendation).where(
+                Recommendation.id == action.get("recommendation_id"),
+                Recommendation.tenant_id == get_current_tenant_id(),
+                Recommendation.owner_id == get_current_owner_id(),
+            ))
+            feedback = db.scalar(select(FollowUpFeedback).where(
+                FollowUpFeedback.id == action.get("feedback_id"),
+                FollowUpFeedback.tenant_id == get_current_tenant_id(),
+                FollowUpFeedback.owner_id == get_current_owner_id(),
+            ))
+            item["recommendation"] = ({
+                "id": recommendation.id, "status": recommendation.status,
+                "data_version": recommendation.data_version,
+                "snoozed_until": recommendation.snoozed_until.isoformat() if recommendation.snoozed_until else None,
+            } if recommendation else None)
+            item["feedback"] = ({
+                "id": feedback.id, "status": feedback.status,
+                "data_version": feedback.data_version,
+            } if feedback else None)
         snapshot["actions"].append(item)
     return snapshot
 

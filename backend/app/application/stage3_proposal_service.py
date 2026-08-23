@@ -342,6 +342,8 @@ def _action_summary(action: dict) -> str:
         return f"发布{action.get('entity_type')}知识：{action.get('title', '未填写')}"
     if action_type == "withdraw_knowledge":
         return f"撤回{action.get('entity_type')}知识"
+    if action_type == "snooze_recommendation":
+        return f"下次跟进时间：{action.get('snoozed_until')}"
     return f"{action.get('service_name', action_type)} {action.get('quantity', 1)} 次"
 
 

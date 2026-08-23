@@ -31,7 +31,7 @@ const GROUP_DETAIL = {
   },
 }
 
-export default function ManageDetailView({ group, onBack, products = [], onCreateProduct, onMergeProducts, knowledgeStatus, knowledge = [] }) {
+export default function ManageDetailView({ group, onBack, products = [], onCreateProduct, onMergeProducts, knowledgeStatus, knowledge = [], recommendationStatus }) {
   const detail = GROUP_DETAIL[group?.id] || GROUP_DETAIL.products_services
   const [draft, setDraft] = useState({ canonical_name: '', brand: '', specification: '' })
   const [merge, setMerge] = useState({ source_product_id: '', target_product_id: '' })
@@ -95,7 +95,8 @@ export default function ManageDetailView({ group, onBack, products = [], onCreat
         <div className="v2-kv"><span className="k">知识完整</span><span className="v">{status.knowledge_complete_count} 个当前版本</span></div>
         <div className="v2-kv"><span className="k">Embedding</span><span className="v">{status.embedding.status} · 已索引 {status.embedding.indexed} · 失败 {status.embedding.failed}</span></div>
         <div className="v2-kv"><span className="k">RAG</span><span className="v">{status.rag.status} · 每次最多 {status.rag.result_limit} 条证据</span></div>
-        <div className="v2-kv"><span className="k">推荐</span><span className="v">{status.recommendation_built ? '已开启' : '未建设（阶段6边界）'}</span></div>
+        <div className="v2-kv"><span className="k">推荐</span><span className="v">{recommendationStatus?.capabilities?.sql_authoritative_rules ? 'SQL权威规则已接通' : '未建设（阶段6边界）'}</span></div>
+        <div className="v2-kv"><span className="k">话术与外发</span><span className="v">本地安全模板 · 只允许复制 · 外发未建设</span></div>
         <div className="v2-section">
           <strong>当前已发布知识与来源</strong>
           {knowledge.map((item) => <div className="v2-kv" key={item.document_id}>
@@ -104,7 +105,7 @@ export default function ManageDetailView({ group, onBack, products = [], onCreat
           </div>)}
           {!knowledge.length && <div className="v2-state">知识不足：暂无已确认且当前有效的知识</div>}
         </div>
-        <p className="v2-hint">本页只读，无输入框、开关、保存按钮；不返回模型、Embedding、RAG 参数、API Key 或提示词全文。</p>
+        <p className="v2-hint">本页只读，无输入框、开关、保存按钮；不返回规则权重、阈值、模型、Embedding、RAG 参数、API Key 或提示词全文。</p>
       </div>
     )
   }

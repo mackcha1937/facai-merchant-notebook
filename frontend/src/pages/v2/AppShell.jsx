@@ -8,7 +8,7 @@ import TopBar from '../../components/v2/TopBar.jsx'
 import Drawer from '../../components/v2/Drawer.jsx'
 import LeftNav from '../../components/v2/LeftNav.jsx'
 import ChatView from '../v2/ChatView.jsx'
-import TodayTaskCard from '../../components/v2/TodayTaskCard.jsx'
+import RecommendationTodayTaskCard from '../../components/v2/RecommendationTodayTaskCard.jsx'
 import CustomerIndexCard from '../../components/v2/CustomerIndexCard.jsx'
 import CustomerRecordCard from '../../components/v2/CustomerRecordCard.jsx'
 import ServiceDetailCard from '../../components/v2/ServiceDetailCard.jsx'
@@ -43,18 +43,21 @@ export default function AppShell({ initialView = 'chat' }) {
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [draftInput, setDraftInput] = useState(() => window.localStorage.getItem('facai-v2-draft') || '')
-  const [todayTasks, setTodayTasks] = useState([])
+  const [pendingTasks, setPendingTasks] = useState([])
+  const [recommendationTasks, setRecommendationTasks] = useState([])
   const [customers, setCustomers] = useState([])
   const [records, setRecords] = useState({})
   const [serviceDetails, setServiceDetails] = useState({})
   const [products, setProducts] = useState([])
   const [knowledgeStatus, setKnowledgeStatus] = useState(null)
   const [knowledge, setKnowledge] = useState([])
+  const [stage6Status, setStage6Status] = useState(null)
   const [chatRefreshToken, setChatRefreshToken] = useState(0)
   const [dataError, setDataError] = useState('')
   const savedDraftRef = useRef('')
 
   const current = stackRef.current.current
+  const todayTasks = [...recommendationTasks, ...pendingTasks]
   const counts = computeTodayTaskCounts(todayTasks)
   const persistStack = useCallback(() => {
     window.sessionStorage.setItem('facai-v2-context-stack', JSON.stringify(stackRef.current.snapshot()))
@@ -73,6 +76,41 @@ export default function AppShell({ initialView = 'chat' }) {
       setDataError(error.message)
     }
   }, [])
+
+  const mapRecommendation = useCallback((item) => ({
+    id: `recommendation-${item.id}`,
+    recommendation_id: item.id,
+    group: 'suggested_follow_up',
+    type: item.type,
+    customer_name: item.customer.display_name,
+    summary: item.reason,
+    date: item.snoozed_until || '今日',
+    unread: item.unread,
+    read_at: item.read_at,
+    handled_at: item.handled_at,
+    status: item.status,
+    data_version: item.data_version,
+    recommendation: item,
+  }), [])
+
+  const refreshRecommendationTasks = useCallback(async () => {
+    try {
+      const data = await api.getTodayRecommendations('top3')
+      setRecommendationTasks((data.items || []).map(mapRecommendation))
+      setDataError('')
+    } catch (error) {
+      setDataError(error.message)
+    }
+  }, [mapRecommendation])
+
+  useEffect(() => {
+    Promise.all([api.getStage6Status(), api.getTodayRecommendations('top3')])
+      .then(([status, tasks]) => {
+        setStage6Status(status)
+        setRecommendationTasks((tasks.items || []).map(mapRecommendation))
+      })
+      .catch((error) => setDataError(error.message))
+  }, [mapRecommendation])
 
   useEffect(() => { refreshCustomers() }, [refreshCustomers])
   const refreshProducts = useCallback(async () => {
@@ -98,8 +136,9 @@ export default function AppShell({ initialView = 'chat' }) {
   }, [])
 
   const mapPending = useCallback((items) => {
-    setTodayTasks(items.map((item) => ({
-      id: item.id,
+    setPendingTasks(items.map((item) => ({
+      id: `pending-${item.id}`,
+      pending_id: item.id,
       group: item.status === 'pending' ? 'pending' : 'conflict',
       customer_name: item.proposal.customer?.display_name || '待确认事项',
       summary: item.proposal.changes_summary || item.status,
@@ -195,11 +234,48 @@ export default function AppShell({ initialView = 'chat' }) {
   }, [goChat, openCustomerIndex, openManagement])
 
   const handleTaskRead = useCallback((id) => {
-    api.markPendingRead(id)
-      .then(() => setTodayTasks((prev) => markTaskRead(prev, id)))
+    const task = todayTasks.find((item) => item.id === id)
+    if (!task || !task.unread) return
+    if (task.recommendation_id) {
+      api.markRecommendationRead(task.recommendation_id, {
+        data_version: task.data_version,
+        idempotency_key: requestKey('recommendation-read'),
+      }).then(refreshRecommendationTasks).catch((error) => setDataError(error.message))
+      return
+    }
+    api.markPendingRead(task.pending_id)
+      .then(() => setPendingTasks((prev) => markTaskRead(prev, id)))
       .catch((error) => setDataError(error.message))
-  }, [])
+  }, [refreshRecommendationTasks, todayTasks])
   const handleTaskHandle = useCallback(() => goChat(), [goChat])
+
+  const handleRecommendationAction = useCallback(async (task, action, feedbackText = '') => {
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
+    tomorrow.setHours(10, 0, 0, 0)
+    await api.submitRecommendationFeedback(task.recommendation_id, {
+      action,
+      feedback_text: feedbackText || null,
+      snoozed_until: action === 'snoozed' ? tomorrow.toISOString() : null,
+      data_version: task.data_version,
+      idempotency_key: requestKey(`recommendation-${action}`),
+      request_id: requestKey(`feedback-${action}`).slice(0, 64),
+    })
+    await refreshRecommendationTasks()
+  }, [refreshRecommendationTasks])
+
+  const handleRecommendationRewrite = useCallback(async (task, variant) => {
+    await api.rewriteRecommendationMessage(task.recommendation_id, {
+      variant, idempotency_key: requestKey(`rewrite-${variant}`),
+    })
+    await refreshRecommendationTasks()
+  }, [refreshRecommendationTasks])
+
+  const handleRecommendationCopy = useCallback(async (task, draft) => {
+    const result = await api.copyRecommendationMessage(task.recommendation_id, draft.id, {
+      data_version: draft.data_version, idempotency_key: requestKey('copy-message'),
+    })
+    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(result.content)
+  }, [])
 
   const handleAuthoritativeWrite = useCallback(() => {
     refreshCustomers()
@@ -251,11 +327,14 @@ export default function AppShell({ initialView = 'chat' }) {
     switch (current.viewType) {
       case VIEW_TYPES.TODAY:
         return (
-          <TodayTaskCard
+          <RecommendationTodayTaskCard
             tasks={todayTasks}
             groupLabels={todayTaskGroups}
             onRead={handleTaskRead}
             onHandle={handleTaskHandle}
+            onRecommendationAction={handleRecommendationAction}
+            onRewrite={handleRecommendationRewrite}
+            onCopy={handleRecommendationCopy}
             onBack={back}
             savedScroll={current.scrollPosition || 0}
             onScrollChange={(pos) => { current.scrollPosition = pos }}
@@ -295,6 +374,7 @@ export default function AppShell({ initialView = 'chat' }) {
           group={mockManageGroups.find((g) => g.id === current.groupId)} onBack={back}
           products={products} onCreateProduct={createProductProposal} onMergeProducts={mergeProductProposal}
           knowledgeStatus={knowledgeStatus} knowledge={knowledge}
+          recommendationStatus={stage6Status}
         />
       case VIEW_TYPES.CHAT:
       default:
