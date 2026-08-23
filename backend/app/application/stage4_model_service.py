@@ -76,12 +76,18 @@ _INJECTION_PATTERN = re.compile(
     r"customer_id|product_id",
     re.IGNORECASE,
 )
-_MOBILE_PATTERN = re.compile(r"(?<!\d)(?:\+?86[-\s]?)?1[3-9]\d{9}(?!\d)")
+_MOBILE_PATTERN = re.compile(
+    r"(?<!\d)(?:\+?86[ \t-]*)?1[3-9](?:[ \t-]*\d){9}(?![ \t-]*\d)"
+)
 _EMAIL_PATTERN = re.compile(
     r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![A-Za-z0-9.-])"
 )
 _WECHAT_PATTERN = re.compile(
-    r"(?:微信号|微信|wechat(?:\s*id)?|wx)\s*(?:是|为|[:：])?\s*"
+    r"(?:"
+    r"(?:微信号|微信)\s*(?:是|为|[:：])?\s*|"
+    r"(?<![A-Za-z0-9])(?:wechat(?:[ \t]+id)?|wx|vx)"
+    r"(?:[ \t]*(?:is|[:：])[ \t]*|[ \t]+)"
+    r")"
     r"[A-Za-z][-_A-Za-z0-9]{5,19}(?![-_A-Za-z0-9])",
     re.IGNORECASE,
 )

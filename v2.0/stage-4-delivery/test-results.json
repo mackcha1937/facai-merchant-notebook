@@ -1,6 +1,6 @@
 {
   "status": "通过",
-  "backend": "205 项通过（含阶段1—阶段4回归与 22 项阶段4 MockModel/安全运行链测试）",
+  "backend": "221 项通过（含阶段1—阶段4回归与 38 项阶段4 MockModel/安全运行链测试）",
   "frontend": "38 项通过（7 个测试文件）",
   "build": "Vite 生产构建通过（75 modules transformed）",
   "sensitive_scan": "通过；应用源码、前端产物与 V2 文档无真实 key 命中",
@@ -19,7 +19,7 @@
     "automatic_test": "MockModel 已通过",
     "paid_call": "未执行，等待单独授权"
   },
-  "security_gates": "PII 零外发、事实值原文支持、产品数量后端确定性校验、确认/取消/选择零模型调用已通过",
+  "security_gates": "连续/+86/空格/短横线手机号、显式微信号/WX/VX、邮箱 PII 零外发与完整脱敏，事实值原文支持、产品数量后端确定性校验、确认/取消/选择零模型调用已通过",
   "external_model": "未调用外部收费模型 API；不宣称真实模型已验收",
   "rag": "未建设"
 }

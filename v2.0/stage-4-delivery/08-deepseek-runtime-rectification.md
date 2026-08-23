@@ -38,7 +38,7 @@ POST /api/owner/chat/turn（或 /stream）
 
 ## 4. MockModel 自动测试
 
-`backend/tests/test_v2_stage4_model_runtime.py` 现有 22 项用例：
+`backend/tests/test_v2_stage4_model_runtime.py` 现有 38 项用例：
 
 - 配置模型时实际构造 `DeepSeekAdapter` 并调用 `chat`；
 - 合法事实及产品名/品牌/规格进入 ProductMatchCard/Proposal；
@@ -46,7 +46,7 @@ POST /api/owner/chat/turn（或 /stream）
 - 超时后规则降级，零权威写入；
 - 畸形 JSON、非法枚举、超长字段、非原文证据、越界置信度、伪造 `customer_id/product_id` 和提示注入整体拒绝；
 - 未配置 Key 或付费开关关闭时不构造 Adapter，规则和手动 Proposal 继续可用；
-- 幻觉事实值、伪造数量、手机号/微信号/邮箱外发均被拦截；
+- 幻觉事实值、伪造数量、连续/`+86`/空格/短横线手机号、显式微信号/WX/VX 和邮箱外发均被拦截，PII 替换不残留原始格式；
 - 确认、取消和候选选择不调用模型；
 - 阶段4状态 API 分开暴露 `configured`、`enabled`、`effective` 布尔值，不暴露 Key。
 

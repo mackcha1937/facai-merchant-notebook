@@ -21,6 +21,17 @@ from app.schemas.conversation import (
 
 
 NOW = datetime(2026, 8, 23, 4, 0, tzinfo=timezone.utc)
+PII_CASES = [
+    ("13800138000", "[手机号已隐藏]"),
+    ("+86 13800138000", "[手机号已隐藏]"),
+    ("138 0013 8000", "[手机号已隐藏]"),
+    ("138-0013-8000", "[手机号已隐藏]"),
+    ("微信号 abc_123", "[微信号已隐藏]"),
+    ("WX: abc123", "[微信号已隐藏]"),
+    ("VX: abc123", "[微信号已隐藏]"),
+    ("vx: abc123", "[微信号已隐藏]"),
+    ("user@example.com", "[邮箱已隐藏]"),
+]
 
 
 class MockModel:
@@ -254,25 +265,46 @@ def test_forged_product_quantity_is_rejected_and_rule_quantity_wins(db_session, 
     assert db_session.scalar(select(func.count(LedgerEntry.id))) == 0
 
 
-@pytest.mark.parametrize(
-    "pii",
-    ["13800138000", "微信号 abc_123", "user@example.com"],
-)
+@pytest.mark.parametrize(("pii", "marker"), PII_CASES)
+def test_contains_and_redact_pii_covers_supported_formats(pii, marker):
+    original = f"前缀{pii}后缀"
+
+    assert stage4_model_service.contains_pii(original) is True
+    redacted = stage4_model_service.redact_pii(original)
+    assert redacted == f"前缀{marker}后缀"
+    assert pii not in redacted
+
+
+def test_wechat_gate_requires_explicit_label_and_ascii_boundary():
+    for ordinary_text in ("abc123", "VXabc123", "prefixVX: abc123", "order-wxabc123"):
+        assert stage4_model_service.contains_pii(ordinary_text) is False
+        assert stage4_model_service.redact_pii(ordinary_text) == ordinary_text
+
+
+@pytest.mark.parametrize(("pii", "_marker"), PII_CASES)
 def test_pii_gate_prevents_adapter_call_external_text_and_authoritative_write(
-    db_session, monkeypatch, pii
+    db_session, monkeypatch, pii, _marker
 ):
     seed_customer(db_session)
     model = MockModel(valid_model_json())
-    monkeypatch.setattr(stage4_model_service, "build_runtime_adapter", lambda: model)
+    adapter_builds = []
+    monkeypatch.setattr(
+        stage4_model_service,
+        "build_runtime_adapter",
+        lambda: adapter_builds.append(True) or model,
+    )
     original = f"甲姐皮肤敏感，联系方式 {pii}。"
 
     result = chat(db_session, original, f"pii-gate-{len(pii)}")
+    assert adapter_builds == []
     assert model.calls == []
     assert result["proposal"]["model_runtime"]["status"] == "pii_fallback"
     messages = db_session.scalars(select(Message)).all()
     proposals = db_session.scalars(select(AgentProposal)).all()
     assert all(pii not in message.content for message in messages)
     assert all(pii not in proposal.original_input for proposal in proposals)
+    assert all(pii not in proposal.parsed_json for proposal in proposals)
+    assert pii not in json.dumps(result, ensure_ascii=False)
     assert db_session.scalar(select(func.count(CustomerFact.id))) == 0
     assert db_session.scalar(select(func.count(Product.id))) == 0
     assert db_session.scalar(select(func.count(LedgerEntry.id))) == 0

@@ -11,9 +11,11 @@
 | Key 存在即可能产生付费调用 | 新增 `ENABLE_V2_REAL_MODEL`，默认 false；只有 Key 已配置且开关明确为 true 才构造 `DeepSeekAdapter` | 本机 Key 已配置时状态为 `configured=true`、`enabled=false`、`effective=false`，Adapter 零构造 |
 | 事实值未受证据约束 | `display_value` 必须由对应 `evidence_text` 直接支持，否则整体拒绝模型结果并回退 | “甲姐皮肤敏感”不能产生“严重过敏，禁止使用所有护肤品”；无 CustomerFact 权威写入 |
 | 产品数量可被模型伪造 | 后端从产品 evidence 确定性解析数量，并要求模型数量一致 | “一瓶”解析为 1、“2瓶”解析为 2；模型伪造 999 被拒绝且不能进入 Proposal |
-| 原始 PII 可能外发 | Adapter 调用前检测中国手机号、明确标识的微信号和邮箱；命中返回 `pii_fallback`，脱敏后仅走本地规则/人工路径 | 三类 PII 用例均断言 Adapter 未调用、原文未外发或持久化、零权威写入 |
+| 原始 PII 可能外发 | Adapter 调用前检测中国手机号、明确标识的微信号和邮箱；命中返回 `pii_fallback`，脱敏后仅走本地规则/人工路径 | 各类 PII 用例均断言 Adapter 未调用、原文未外发或持久化、零权威写入 |
 
 确认、取消和产品候选选择仍由确定性后端命令处理，相关测试均证明不会调用模型。
+
+后续独立验收发现手机号分隔格式及 VX 标签漏检，已通过最小补丁补齐：手机号允许数字间空格或短横线并整体脱敏；微信号补充大小写不敏感的 VX 标签，但 ASCII 标签必须有独立边界及冒号/空格分隔。连续号码、`+86`、空格、短横线、微信号、WX、VX/vx 和邮箱均覆盖直接函数及完整聊天链测试；无标签英文串保持不命中。
 
 ## 3. 配置与信息边界
 
@@ -25,10 +27,10 @@
 
 ## 4. 最终验证
 
-- 后端：205 passed；
+- 后端：221 passed；
 - 前端：38 passed（7 个测试文件）；
 - 生产构建：通过，75 modules transformed；
-- 阶段4模型运行链：22 项 MockModel/安全测试；
+- 阶段4模型运行链：38 项 MockModel/安全测试；
 - Migration 往返：`0016 → 0017 → 0016 → 0017`，正式库停留在 `0017_stage4_entity_hardening` 且 `integrity_check=ok`；
 - 真实 DeepSeek 付费请求：0。
 
