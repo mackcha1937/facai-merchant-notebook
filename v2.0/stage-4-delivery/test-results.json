@@ -1,7 +1,7 @@
 {
   "status": "通过",
   "backend": "224 项通过（含阶段1—阶段4回归、39 项阶段4 MockModel/安全运行链测试与 2 项 MockTransport Adapter 契约测试）",
-  "frontend": "38 项通过（7 个测试文件）",
+  "frontend": "39 项通过（7 个测试文件）",
   "build": "Vite 生产构建通过（75 modules transformed）",
   "sensitive_scan": "通过；应用源码、前端产物与 V2 文档无真实 key 命中",
   "migration_cycle": "0016 → 0017 → 0016 → 0017，通过且 integrity_check=ok",
@@ -17,14 +17,21 @@
     "effective": false,
     "default_switch": "ENABLE_V2_REAL_MODEL=false",
     "automatic_test": "MockModel 与 MockTransport 已通过",
-    "external_call_count": 1,
+    "isolated_validation": "passed",
+    "total_paid_calls": 2,
+    "external_call_count": 2,
     "last_http_status": 200,
-    "last_candidate_status": "rejected_fallback",
+    "last_candidate_status": "validated",
+    "last_intent": "product_purchase",
     "authoritative_writes": "CustomerFact=0 / Product=0 / LedgerEntry=0",
     "pending_proposals": 1,
-    "acceptance": "未通过；下一次真实验证需要重新授权"
+    "acceptance": "阶段4隔离控制用例通过；常驻模型仍关闭",
+    "validation_history": [
+      {"sequence": 1, "http_status": 200, "candidate_status": "rejected_fallback", "followup_fix": "6d44e42"},
+      {"sequence": 2, "http_status": 200, "candidate_status": "validated", "intent": "product_purchase"}
+    ]
   },
   "security_gates": "连续/+86/空格/短横线手机号、显式微信号/WX/VX、邮箱 PII 零外发与完整脱敏，事实值原文支持、产品数量后端确定性校验、确认/取消/选择零模型调用已通过",
-  "external_model": "本轮离线整改新增真实请求0次，累计仍为1次；HTTP成功但候选校验未通过，不宣称真实模型已验收",
+  "external_model": "累计真实请求2次：首次rejected_fallback，6d44e42修复后第二次validated；本次记录收尾新增请求0次",
   "rag": "未建设"
 }

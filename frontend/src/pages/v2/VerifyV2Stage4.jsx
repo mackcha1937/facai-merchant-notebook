@@ -89,9 +89,11 @@ export default function VerifyV2Stage4() {
           <h2>模型验证边界</h2>
           <div className="v1-row"><span className="k">后端模型配置</span><span className="v">{data ? (data.status.model_validation?.configured ? '已配置（不显示 Key）' : '未配置') : '加载中'}</span></div>
           <div className="v1-row"><span className="k">V2 真实模型开关</span><span className={`v ${data?.status?.model_validation?.enabled ? 'warn' : 'ok'}`}>{data ? (data.status.model_validation?.enabled ? '已显式开启' : '已关闭（默认）') : '加载中'}</span></div>
+          <div className="v1-row"><span className="k">常驻真实模型生效状态</span><span className={`v ${data?.status?.model_validation?.effective ? 'warn' : 'ok'}`}>{data ? (data.status.model_validation?.effective ? '已生效' : '未生效（保持关闭）') : '加载中'}</span></div>
           <div className="v1-row"><span className="k">V2 主对话代码路径</span><span className="v ok">已接通 DeepSeekAdapter</span></div>
-          <div className="v1-row"><span className="k">自动测试</span><span className="v ok">MockModel 已通过</span></div>
-          <div className="v1-row"><span className="k">真实付费 DeepSeek 调用</span><span className="v pending">未执行，等待授权</span></div>
+          <div className="v1-row"><span className="k">自动测试</span><span className="v ok">MockModel / MockTransport 已通过</span></div>
+          <div className="v1-row"><span className="k">隔离真实模型验收</span><span className="v ok">{data ? (data.status.model_validation?.isolated_validation === 'passed' ? '已通过' : '未通过') : '加载中'}</span></div>
+          <div className="v1-row"><span className="k">累计真实付费调用</span><span className="v">{data ? `${data.status.model_validation?.total_paid_calls ?? 0} 次（静态验收记录）` : '加载中'}</span></div>
         </div>
 
         <div className="v1-panel">

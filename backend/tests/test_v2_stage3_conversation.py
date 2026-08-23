@@ -341,7 +341,9 @@ def test_latest_customer_record_reads_authoritative_balance(client, db_session):
 
 def test_api_conflict_is_http_409_and_recoverable(client, db_session):
     seed(db_session)
-    proposal = turn(db_session, key="turn-key-api-conflict")["proposal"]
+    proposal = turn(
+        db_session, key="turn-key-api-conflict", now=datetime.now(timezone.utc)
+    )["proposal"]
     body = {"idempotency_key": "confirm-api-phone", "device_id": "phone", "data_version": 1}
     assert client.post(f"/api/owner/proposals/{proposal['id']}/confirm", json=body).status_code == 200
     body["idempotency_key"] = "confirm-api-web"

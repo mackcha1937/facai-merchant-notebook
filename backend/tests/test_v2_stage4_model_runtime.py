@@ -511,6 +511,7 @@ def test_stage4_status_exposes_only_configuration_boolean_not_secret(db_session,
     assert status["model_validation"]["configured"] is True
     assert status["model_validation"]["enabled"] is False
     assert status["model_validation"]["effective"] is False
-    assert status["model_validation"]["paid_call"] == "disabled_by_default_waiting_authorization"
+    assert status["model_validation"]["isolated_validation"] == "passed"
+    assert status["model_validation"]["total_paid_calls"] == 2
     assert secret not in serialized
     assert "deepseek_api_key" not in serialized

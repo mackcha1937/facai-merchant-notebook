@@ -4,7 +4,7 @@
 
 阶段4 V2 主对话具备真实运行时路径，但只有后端配置 `DEEPSEEK_API_KEY` 且 `ENABLE_V2_REAL_MODEL=true` 时才会构造 `DeepSeekAdapter` 并调用 `chat`。开关默认 false。安全关键的“确认 / 取消 / 选择候选”命令继续由确定性后端状态机处理，不交给模型。
 
-代码路径已用 MockModel/MockTransport 验证。此前唯一一次获授权的隔离真实请求返回 HTTP 200，但结构化候选未通过本地严格校验并进入 `rejected_fallback`；业务权威表零写入，仅保留 1 个未确认 Proposal。因此不宣称真实模型已验收。
+代码路径已用 MockModel/MockTransport 验证。第 1 次隔离真实请求 HTTP 200 但结构化候选进入 `rejected_fallback`；经 `6d44e42` 对齐 JSON Output 与 non-thinking 协议后，第 2 次隔离真实请求 HTTP 200 且进入 `validated`，阶段4真实模型控制用例验收通过。
 
 ## 2. V2 模型调用链
 
@@ -54,18 +54,10 @@ pytest 通过 autouse 隔离门默认清空模型配置，所有模型用例都�
 
 `backend/tests/test_deepseek_adapter_contract.py` 另有 2 项 MockTransport 请求契约用例，断言 `deepseek-v4-pro`、`response_format=json_object`、`thinking=disabled`、`stream=false`、messages、`max_tokens=2000` 和 `temperature=0.0`，并验证成功响应及 HTTP 错误不泄露测试 Key。`check_connectivity` 最小 ping 未修改。
 
-## 5. 下一次待重新授权的真实验证步骤
+## 5. 后续真实请求边界
 
-此前授权只覆盖累计唯一 1 次真实请求，已经用完。下一次验证不得沿用旧授权，必须重新获得店主明确授权后才可执行：
-
-1. 创建隔离的临时 SQLite 数据库和纯虚构客户/产品数据；
-2. 确认隔离环境与费用上限后，手动设置 `ENABLE_V2_REAL_MODEL=true`；不输出、传递或记录 API Key；
-3. 通过 V2 `POST /api/owner/chat/turn` 发送一条含虚构客户、事实和产品名/品牌/规格的控制输入；
-4. 验证 `model_runtime.status=validated`、候选证据来自原文、实体 ID 来自后端检索且候选最多 3 个；
-5. 在不点击确认的情况下检查 CustomerFact、Product 和 LedgerEntry 均无新写入；
-6. 检查应用日志、API 响应和前端不含 Key 或模型 raw 响应；
-7. 记录请求次数、脱敏结果和费用边界，然后停止，不进入阶段5。
+两次隔离验证授权均已用完。任何后续真实请求不得沿用旧授权，必须重新获得店主明确授权；常驻 `ENABLE_V2_REAL_MODEL` 继续保持 false。
 
 ## 6. 当前停点
 
-离线协议整改和 MockModel/MockTransport 自动测试已完成；本轮未新增真实请求，累计仍为 1 次。真实候选尚未验收，下一次请求需要重新授权。阶段5、RAG、Embedding 和推荐均未开始。
+离线协议整改、自动测试和阶段4隔离真实控制用例验收均已完成，累计真实请求 2 次。本次验收记录收尾未新增真实请求。阶段5、RAG、Embedding 和推荐均未开始。

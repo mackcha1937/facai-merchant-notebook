@@ -1,10 +1,12 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { api } from '../api.js'
 import ConfirmCard from '../components/v2/ConfirmCard.jsx'
 import CustomerRecordCard from '../components/v2/CustomerRecordCard.jsx'
 import ManageDetailView from '../components/v2/ManageDetailView.jsx'
 import ChatView from '../pages/v2/ChatView.jsx'
+import VerifyV2Stage4 from '../pages/v2/VerifyV2Stage4.jsx'
 
 const factProductProposal = {
   id: 41,
@@ -90,5 +92,29 @@ describe('阶段4产品管理与聊天匹配', () => {
     render(<ChatView draftInput="" onDraftChange={() => {}} />)
     fireEvent.click(await screen.findByText('舒缓修护面膜'))
     await waitFor(() => expect(api.resolveProposalProduct).toHaveBeenCalledWith(51, expect.objectContaining({ product_id: 8, create_new: false })))
+  })
+})
+
+describe('阶段4真实模型静态验收状态', () => {
+  it('展示隔离验收通过和累计次数，同时保持常驻模型未生效', async () => {
+    vi.spyOn(api, 'getStage4Status').mockResolvedValue({
+      capabilities: {},
+      model_validation: {
+        configured: true,
+        enabled: false,
+        effective: false,
+        isolated_validation: 'passed',
+        total_paid_calls: 2,
+      },
+      test_results: { status: '通过' },
+    })
+    vi.spyOn(api, 'getProducts').mockResolvedValue([])
+
+    render(<MemoryRouter><VerifyV2Stage4 /></MemoryRouter>)
+
+    expect(await screen.findByText('已通过')).toBeInTheDocument()
+    expect(screen.getByText('2 次（静态验收记录）')).toBeInTheDocument()
+    expect(screen.getByText('未生效（保持关闭）')).toBeInTheDocument()
+    expect(screen.queryByText(/等待授权|未执行/)).not.toBeInTheDocument()
   })
 })

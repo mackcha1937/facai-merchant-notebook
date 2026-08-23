@@ -2,11 +2,11 @@
 
 ## 1. 验证状态
 
-此前唯一授权窗口已执行累计 1 次隔离真实请求：模型 `deepseek-v4-pro`、官方端点 `https://api.deepseek.com`、HTTP 200、`external_call_count=1`。返回候选未通过本地严格校验，运行状态为 `rejected_fallback`。
+第 1 次授权窗口执行了 1 次隔离真实请求：模型 `deepseek-v4-pro`、官方端点 `https://api.deepseek.com`、HTTP 200、当时 `external_call_count=1`。返回候选未通过本地严格校验，运行状态为 `rejected_fallback`。
 
 安全门禁按设计生效：CustomerFact、Product、LedgerEntry 均 0 写入，只保留 1 个未确认 Proposal；Key 和模型 raw 输出未暴露。该结果不构成真实模型验收。
 
-本轮只完成离线协议整改，没有发起第二次真实请求。下一次真实验证必须重新获得明确授权。
+提交 `6d44e42` 只完成离线协议整改，当时没有发起第二次真实请求。此后另行授权的第 2 次隔离验证 HTTP 200 且 `validated`，累计真实请求更新为 2 次；完整证据见独立阶段4真实验收报告。
 
 ## 2. 官方协议对齐
 
@@ -34,4 +34,4 @@
 
 ## 4. 当前停点
 
-`ENABLE_V2_REAL_MODEL=false`，真实模型路径未启用。本轮完成后继续停在阶段4，不开始阶段5、RAG、Embedding 或推荐。
+`ENABLE_V2_REAL_MODEL=false`，常驻真实模型路径未启用。协议整改后的隔离控制用例已经验收；任何新增真实请求仍需重新授权。继续停在阶段4，不开始阶段5、RAG、Embedding 或推荐。

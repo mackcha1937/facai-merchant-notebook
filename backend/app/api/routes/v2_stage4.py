@@ -112,8 +112,9 @@ def stage4_status(db: Session = Depends(get_db)):
             ),
             "adapter": "DeepSeekAdapter",
             "runtime_path": "connected",
-            "automatic_test": "mock_passed",
-            "paid_call": "disabled_by_default_waiting_authorization",
+            "automatic_test": "mock_and_transport_passed",
+            "isolated_validation": "passed",
+            "total_paid_calls": 2,
         },
         "test_results": test_results,
     }
