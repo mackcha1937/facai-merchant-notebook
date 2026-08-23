@@ -28,6 +28,11 @@
 API Base URL: https://api.deepseek.com
 Model ID: deepseek-v4-pro
 API Key: 仅保存在后端本地 .env 文件中，不进入文档、前端或版本库
+V2 真实模型开关: `ENABLE_V2_REAL_MODEL=false`（默认关闭）
 ```
 
 模型 ID 必须在开发第 0 阶段通过最小请求验证。若接口拒绝该模型 ID，应暂停并请用户核对，不得自行猜测或替换。
+
+V2 主对话只有在 `DEEPSEEK_API_KEY` 已配置且
+`ENABLE_V2_REAL_MODEL=true` 时才会构造真实 `DeepSeekAdapter`。该开关仅能在
+获得单独付费调用授权后手动开启；配置 Key 本身不代表授权。

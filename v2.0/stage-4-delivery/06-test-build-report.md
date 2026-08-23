@@ -4,11 +4,11 @@
 
 命令：`cd backend && .venv/bin/pytest -q`
 
-结果：195 passed。覆盖阶段1—4回归、事实候选/确认/版本/撤销、产品精确/别名/模糊/本地语义候选、最多 3 个候选、新产品+购买原子事务、合并、tenant/owner、幂等、回滚、语音转写和 Migration。
+结果：205 passed。覆盖阶段1—4回归、事实候选/确认/版本/撤销、产品精确/别名/模糊/本地语义候选、最多 3 个候选、新产品+购买原子事务、合并、tenant/owner、幂等、回滚、语音转写和 Migration。
 
-新增 13 项 V2 MockModel/安全运行链测试，覆盖：已配置时构造并调用 `DeepSeekAdapter`、合法事实/产品候选进入 Proposal、模型澄清问题、超时降级、畸形 JSON、非法枚举、超长字段、非原文证据、越界置信度、提示注入、伪造 ID、失败时零权威写入、未配置 Key 的规则/手动路径，以及状态 API 只暴露配置布尔值。
+阶段4模型运行链文件共 22 项 MockModel/安全用例。本次审计新增 10 项全量用例，覆盖：Key 已配置但付费开关关闭时 Adapter 零构造、配置默认值为 false、事实值缺少证据支撑时拒绝、中文/数字产品数量的后端确定性校验、999 伪造数量拒绝、手机号/微信号/邮箱 PII 零外发与本地脱敏，以及确认/取消/候选选择零模型调用。
 
-仅有 1 条 Starlette TestClient 弃用警告，不影响结果。pytest 通过 autouse 隔离门清空模型配置；只有上述用例显式注入 MockModel，没有调用外部收费模型 API。
+仅有 1 条 Starlette TestClient 弃用警告，不影响结果。pytest 通过 autouse 隔离门同时清空 Key 与关闭 `ENABLE_V2_REAL_MODEL`；只有上述用例显式注入 MockModel，没有调用外部收费模型 API。
 
 ## 2. 前端
 
@@ -39,4 +39,5 @@
 
 - 代码运行路径：已接通；
 - MockModel 自动测试：已通过；
+- 当前本地状态：`configured=true`、`enabled=false`、`effective=false`；
 - 真实付费 DeepSeek 请求：未执行，等待店主单独授权。

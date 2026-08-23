@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.infrastructure.llm.deepseek import DeepSeekAdapter
 from app.main import app
 
@@ -27,6 +27,10 @@ def test_adapter_returns_not_configured_without_key():
     result = adapter.check_connectivity()
     assert result.configured is False
     assert result.success is False
+
+
+def test_v2_real_model_runtime_switch_defaults_to_false():
+    assert Settings.model_fields["enable_v2_real_model"].default is False
 
 
 def test_model_status_does_not_expose_key():

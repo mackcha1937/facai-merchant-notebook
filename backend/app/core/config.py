@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     deepseek_api_key: str = ""
     model_request_timeout_seconds: float = 60.0
 
+    # V2 真实模型付费调用独立开关；默认关闭，需获得授权后显式开启。
+    enable_v2_real_model: bool = False
+
     # 阶段0 模型验证开关（会产生真实模型费用，仅开发环境显式开启）
     enable_stage0_verify: bool = False
 

@@ -11,7 +11,7 @@ from app.api.routes import v2_stage4
 from app.application import conversation_service, stage4_entity_service, stage4_model_service
 from app.core.tenant import set_current_owner_id, set_current_tenant_id
 from app.infrastructure.llm.base import ModelTimeoutError
-from app.infrastructure.models import AgentProposal, CustomerFact, LedgerEntry, Product
+from app.infrastructure.models import AgentProposal, CustomerFact, LedgerEntry, Message, Product
 from app.repositories import customers as customer_repo
 from app.schemas.conversation import (
     ChatTurnRequest,
@@ -90,7 +90,7 @@ def valid_model_json():
 def test_configured_v2_runtime_constructs_deepseek_adapter_and_calls_chat(db_session, monkeypatch):
     seed_customer(db_session)
     model = MockModel(valid_model_json())
-    settings = SimpleNamespace(is_model_configured=True)
+    settings = SimpleNamespace(is_model_configured=True, enable_v2_real_model=True)
     created_with = []
 
     monkeypatch.setattr(stage4_model_service, "get_settings", lambda: settings)
@@ -150,6 +150,131 @@ def test_model_timeout_safely_falls_back_to_rules_without_authoritative_write(
     assert result["proposal"]["model_runtime"]["status"] == "timeout_fallback"
     assert result["proposal"]["actions"][0]["extraction_source"] == "rule"
     assert db_session.scalar(select(func.count(CustomerFact.id))) == 0
+    assert db_session.scalar(select(func.count(LedgerEntry.id))) == 0
+
+
+def test_key_configured_but_runtime_switch_disabled_never_constructs_adapter(
+    db_session, monkeypatch
+):
+    seed_customer(db_session)
+    settings = SimpleNamespace(is_model_configured=True, enable_v2_real_model=False)
+
+    def must_not_construct(*_args, **_kwargs):
+        raise AssertionError("付费开关关闭时不应构造 DeepSeekAdapter")
+
+    monkeypatch.setattr(stage4_model_service, "get_settings", lambda: settings)
+    monkeypatch.setattr(stage4_model_service, "DeepSeekAdapter", must_not_construct)
+    result = chat(db_session, "甲姐皮肤敏感。", "disabled-real-model")
+
+    assert result["proposal"]["model_runtime"] == {
+        "attempted": False, "status": "disabled_fallback", "intent": None,
+    }
+    assert result["status"] == "pending"
+    assert db_session.scalar(select(func.count(CustomerFact.id))) == 0
+
+
+def test_hallucinated_fact_value_without_evidence_support_is_rejected(db_session, monkeypatch):
+    seed_customer(db_session)
+    model = MockModel(json.dumps({
+        "intent": "customer_fact_update",
+        "customer_query": "甲姐",
+        "customer_evidence": "甲姐",
+        "facts": [{
+            "fact_type": "skin_sensitivity",
+            "display_value": "严重过敏，禁止使用所有护肤品",
+            "evidence_text": "甲姐皮肤敏感",
+            "confidence": 0.99,
+            "sensitivity_level": "sensitive",
+        }],
+        "product_purchase": None,
+        "needs_clarification": False,
+        "clarification_question": None,
+    }, ensure_ascii=False))
+    monkeypatch.setattr(stage4_model_service, "build_runtime_adapter", lambda: model)
+
+    result = chat(db_session, "甲姐皮肤敏感。", "hallucinated-fact-value")
+    assert result["proposal"]["model_runtime"]["status"] == "rejected_fallback"
+    fact_actions = [
+        action for action in result["proposal"]["actions"]
+        if action["type"] == "upsert_customer_fact"
+    ]
+    assert [action["display_value"] for action in fact_actions] == ["敏感"]
+    assert db_session.scalar(select(func.count(CustomerFact.id))) == 0
+
+
+def product_model_json(evidence, quantity):
+    return json.dumps({
+        "intent": "product_purchase",
+        "customer_query": "甲姐",
+        "customer_evidence": "甲姐",
+        "facts": [],
+        "product_purchase": {
+            "name": "面霜", "brand": None, "specification": None,
+            "quantity": quantity, "evidence_text": evidence, "confidence": 0.95,
+        },
+        "needs_clarification": False,
+        "clarification_question": None,
+    }, ensure_ascii=False)
+
+
+@pytest.mark.parametrize(
+    ("text", "evidence", "quantity"),
+    [
+        ("甲姐买了面霜一瓶。", "买了面霜一瓶", 1),
+        ("甲姐买了面霜2瓶。", "买了面霜2瓶", 2),
+    ],
+)
+def test_product_quantity_must_match_deterministic_backend_parse(
+    db_session, monkeypatch, text, evidence, quantity
+):
+    seed_customer(db_session)
+    model = MockModel(product_model_json(evidence, quantity))
+    monkeypatch.setattr(stage4_model_service, "build_runtime_adapter", lambda: model)
+
+    result = chat(db_session, text, f"valid-product-quantity-{quantity}")
+    stored = json.loads(db_session.get(AgentProposal, result["proposal"]["id"]).parsed_json)
+    assert result["status"] == "resolving"
+    assert stored["product_purchase"]["quantity"] == quantity
+    assert stored["model_runtime"]["status"] == "validated"
+    assert db_session.scalar(select(func.count(Product.id))) == 0
+    assert db_session.scalar(select(func.count(LedgerEntry.id))) == 0
+
+
+def test_forged_product_quantity_is_rejected_and_rule_quantity_wins(db_session, monkeypatch):
+    seed_customer(db_session)
+    model = MockModel(product_model_json("买了面霜一瓶", 999))
+    monkeypatch.setattr(stage4_model_service, "build_runtime_adapter", lambda: model)
+
+    result = chat(db_session, "甲姐买了面霜一瓶。", "forged-product-quantity")
+    stored = json.loads(db_session.get(AgentProposal, result["proposal"]["id"]).parsed_json)
+    assert stored["model_runtime"]["status"] == "rejected_fallback"
+    assert stored["product_purchase"]["quantity"] == 1
+    assert all(action.get("quantity") != 999 for action in stored["actions"])
+    assert db_session.scalar(select(func.count(Product.id))) == 0
+    assert db_session.scalar(select(func.count(LedgerEntry.id))) == 0
+
+
+@pytest.mark.parametrize(
+    "pii",
+    ["13800138000", "微信号 abc_123", "user@example.com"],
+)
+def test_pii_gate_prevents_adapter_call_external_text_and_authoritative_write(
+    db_session, monkeypatch, pii
+):
+    seed_customer(db_session)
+    model = MockModel(valid_model_json())
+    monkeypatch.setattr(stage4_model_service, "build_runtime_adapter", lambda: model)
+    original = f"甲姐皮肤敏感，联系方式 {pii}。"
+
+    result = chat(db_session, original, f"pii-gate-{len(pii)}")
+    assert model.calls == []
+    assert result["proposal"]["model_runtime"]["status"] == "pii_fallback"
+    messages = db_session.scalars(select(Message)).all()
+    proposals = db_session.scalars(select(AgentProposal)).all()
+    assert all(pii not in message.content for message in messages)
+    assert all(pii not in proposal.original_input for proposal in proposals)
+    assert db_session.scalar(select(func.count(CustomerFact.id))) == 0
+    assert db_session.scalar(select(func.count(Product.id))) == 0
     assert db_session.scalar(select(func.count(LedgerEntry.id))) == 0
 
 
@@ -264,11 +389,62 @@ def test_unconfigured_key_keeps_rule_and_manual_paths_without_adapter(
     assert db_session.scalar(select(func.count(CustomerFact.id))) == 0
 
 
+def test_confirm_cancel_and_product_choice_commands_never_call_model(db_session, monkeypatch):
+    customer = seed_customer(db_session)
+    model = MockModel(error=AssertionError("确定性命令不得调用模型"))
+    monkeypatch.setattr(stage4_model_service, "build_runtime_adapter", lambda: model)
+
+    first = stage4_entity_service.create_fact_proposal(
+        db_session, customer.id,
+        CustomerFactProposalRequest(
+            facts=[CustomerFactProposalItem(
+                fact_type="preference", display_value="清爽",
+                evidence_text="店主手动录入清爽", confidence=1.0,
+                sensitivity_level="normal",
+            )],
+            request_id="request-manual-command-confirm",
+            idempotency_key="manual-command-confirm-proposal",
+        ),
+    )
+    confirmed = chat(db_session, "确认", "command-confirm")
+    assert first["proposal"]["id"] == confirmed["proposal"]["id"]
+    assert confirmed["status"] == "confirmed"
+    assert model.calls == []
+
+    second = stage4_entity_service.create_fact_proposal(
+        db_session, customer.id,
+        CustomerFactProposalRequest(
+            facts=[CustomerFactProposalItem(
+                fact_type="preference", display_value="滋润",
+                evidence_text="店主手动录入滋润", confidence=1.0,
+                sensitivity_level="normal",
+            )],
+            request_id="request-manual-command-cancel",
+            idempotency_key="manual-command-cancel-proposal",
+        ),
+    )
+    cancelled = chat(db_session, "取消", "command-cancel")
+    assert second["proposal"]["id"] == cancelled["proposal"]["id"]
+    assert cancelled["status"] == "cancelled"
+    assert model.calls == []
+
+    monkeypatch.setattr(stage4_model_service, "build_runtime_adapter", lambda: None)
+    resolving = chat(db_session, "甲姐买了命令测试面霜一瓶。", "command-product")
+    assert resolving["status"] == "resolving"
+    monkeypatch.setattr(stage4_model_service, "build_runtime_adapter", lambda: model)
+    selected = chat(db_session, "作为新产品", "command-product-choice")
+    assert selected["status"] == "pending"
+    assert model.calls == []
+
+
 def test_stage4_status_exposes_only_configuration_boolean_not_secret(db_session, monkeypatch):
     secret = "model-secret-value-for-test"
     monkeypatch.setattr(
         v2_stage4, "get_settings",
-        lambda: SimpleNamespace(is_model_configured=True, deepseek_api_key=secret),
+        lambda: SimpleNamespace(
+            is_model_configured=True, enable_v2_real_model=False,
+            deepseek_api_key=secret,
+        ),
     )
     db_session.execute(sql_text("CREATE TABLE alembic_version (version_num VARCHAR(64))"))
     db_session.execute(
@@ -279,6 +455,8 @@ def test_stage4_status_exposes_only_configuration_boolean_not_secret(db_session,
     status = v2_stage4.stage4_status(db_session)
     serialized = json.dumps(status, ensure_ascii=False)
     assert status["model_validation"]["configured"] is True
-    assert status["model_validation"]["paid_call"] == "not_executed_waiting_authorization"
+    assert status["model_validation"]["enabled"] is False
+    assert status["model_validation"]["effective"] is False
+    assert status["model_validation"]["paid_call"] == "disabled_by_default_waiting_authorization"
     assert secret not in serialized
     assert "deepseek_api_key" not in serialized

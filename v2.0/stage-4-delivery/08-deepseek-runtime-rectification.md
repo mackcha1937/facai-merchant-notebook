@@ -2,7 +2,7 @@
 
 ## 1. 整改结论
 
-阶段4 V2 主对话已从“仅保留可选 Adapter 参数”改为真实运行时路径：后端配置 `DEEPSEEK_API_KEY` 时，每个普通 V2 对话轮次会构造 `DeepSeekAdapter` 并调用 `chat`。安全关键的“确认 / 取消 / 选择候选”命令继续由确定性后端状态机处理，不交给模型。
+阶段4 V2 主对话具备真实运行时路径，但只有后端配置 `DEEPSEEK_API_KEY` 且 `ENABLE_V2_REAL_MODEL=true` 时才会构造 `DeepSeekAdapter` 并调用 `chat`。开关默认 false。安全关键的“确认 / 取消 / 选择候选”命令继续由确定性后端状态机处理，不交给模型。
 
 代码路径已用 MockModel 验证，但本次没有执行真实付费 DeepSeek 请求，因此不宣称真实模型已验收。
 
@@ -12,7 +12,8 @@
 POST /api/owner/chat/turn（或 /stream）
   → conversation_service.chat_turn
   → stage4_model_service.run
-  → 后端 Settings 判断 DEEPSEEK_API_KEY 是否已配置
+  → 手机号 / 明确微信号 / 邮箱 PII 门禁（命中则零外发）
+  → 后端 Settings 同时判断 Key configured 和付费开关 enabled
   → DeepSeekAdapter.chat（仅产生无 ID JSON 候选）
   → Stage4ModelCandidate 严格 Schema + 原文证据 + 注入检查
   → 后端 customer/product/service 权威检索和 tenant/owner 过滤
@@ -29,29 +30,32 @@ POST /api/owner/chat/turn（或 /stream）
 - JSON 必须是单一 object，不宽松截取 Markdown 或解释文字；
 - 顶层和嵌套对象均 `extra=forbid` 且严格类型；
 - intent、fact_type、sensitivity_level 必须属于后端枚举；
-- 所有字段有长度/数量上限，置信度为 0—1；
-- 客户、事实和产品 evidence 必须是用户原文连续片段，产品名/品牌/规格必须受该 evidence 支持；
+- 所有字段有长度/数量上限，置信度为 0—1；产品数量必须与后端对 evidence 的确定性解析一致；
+- 客户、事实和产品 evidence 必须是用户原文连续片段，事实值和产品名/品牌/规格必须受该 evidence 直接支持；
+- PII 命中时不构造或调用 Adapter，仅使用脱敏文本进入本地规则和会话持久化；
 - `customer_id`、`product_id`、额外字段、提示注入内容和不一致澄清标记会导致整个结果被拒绝；
 - 超时、网络错误、畸形 JSON 或校验失败时，不使用部分模型结果，安全回退到规则/人工路径。
 
 ## 4. MockModel 自动测试
 
-`backend/tests/test_v2_stage4_model_runtime.py` 新增 13 项用例：
+`backend/tests/test_v2_stage4_model_runtime.py` 现有 22 项用例：
 
 - 配置模型时实际构造 `DeepSeekAdapter` 并调用 `chat`；
 - 合法事实及产品名/品牌/规格进入 ProductMatchCard/Proposal；
 - 合法澄清问题进入 V2 回复；
 - 超时后规则降级，零权威写入；
 - 畸形 JSON、非法枚举、超长字段、非原文证据、越界置信度、伪造 `customer_id/product_id` 和提示注入整体拒绝；
-- 未配置 Key 时不构造 Adapter，规则和手动 Proposal 继续可用。
-- 阶段4状态 API 只暴露“已配置/未配置”布尔值，不暴露 Key 或配置字段。
+- 未配置 Key 或付费开关关闭时不构造 Adapter，规则和手动 Proposal 继续可用；
+- 幻觉事实值、伪造数量、手机号/微信号/邮箱外发均被拦截；
+- 确认、取消和候选选择不调用模型；
+- 阶段4状态 API 分开暴露 `configured`、`enabled`、`effective` 布尔值，不暴露 Key。
 
 pytest 通过 autouse 隔离门默认清空模型配置，所有模型用例都显式注入 MockModel。
 
 ## 5. 待授权的真实验证步骤
 
 1. 获得店主单独授权后，创建隔离的临时 SQLite 数据库和纯虚构客户/产品数据；
-2. 使用当前后端环境变量构造 `DeepSeekAdapter`，不输出、传递或记录 API Key；
+2. 确认隔离环境与费用上限后，手动设置 `ENABLE_V2_REAL_MODEL=true`；不输出、传递或记录 API Key；
 3. 通过 V2 `POST /api/owner/chat/turn` 发送一条含虚构客户、事实和产品名/品牌/规格的控制输入；
 4. 验证 `model_runtime.status=validated`、候选证据来自原文、实体 ID 来自后端检索且候选最多 3 个；
 5. 在不点击确认的情况下检查 CustomerFact、Product 和 LedgerEntry 均无新写入；

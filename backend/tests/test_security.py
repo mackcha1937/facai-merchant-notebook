@@ -28,6 +28,7 @@ def test_env_example_has_no_real_key():
         line = line.strip()
         if line.startswith("DEEPSEEK_API_KEY="):
             assert line == "DEEPSEEK_API_KEY="
+    assert "ENABLE_V2_REAL_MODEL=false" in content
 
 
 class FakeAdapter:

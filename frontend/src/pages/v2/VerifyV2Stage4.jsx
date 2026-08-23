@@ -88,6 +88,7 @@ export default function VerifyV2Stage4() {
         <div className="v1-panel">
           <h2>模型验证边界</h2>
           <div className="v1-row"><span className="k">后端模型配置</span><span className="v">{data ? (data.status.model_validation?.configured ? '已配置（不显示 Key）' : '未配置') : '加载中'}</span></div>
+          <div className="v1-row"><span className="k">V2 真实模型开关</span><span className={`v ${data?.status?.model_validation?.enabled ? 'warn' : 'ok'}`}>{data ? (data.status.model_validation?.enabled ? '已显式开启' : '已关闭（默认）') : '加载中'}</span></div>
           <div className="v1-row"><span className="k">V2 主对话代码路径</span><span className="v ok">已接通 DeepSeekAdapter</span></div>
           <div className="v1-row"><span className="k">自动测试</span><span className="v ok">MockModel 已通过</span></div>
           <div className="v1-row"><span className="k">真实付费 DeepSeek 调用</span><span className="v pending">未执行，等待授权</span></div>

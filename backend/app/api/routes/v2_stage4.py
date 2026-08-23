@@ -106,10 +106,14 @@ def stage4_status(db: Session = Depends(get_db)):
         },
         "model_validation": {
             "configured": settings.is_model_configured,
+            "enabled": settings.enable_v2_real_model,
+            "effective": (
+                settings.is_model_configured and settings.enable_v2_real_model
+            ),
             "adapter": "DeepSeekAdapter",
             "runtime_path": "connected",
             "automatic_test": "mock_passed",
-            "paid_call": "not_executed_waiting_authorization",
+            "paid_call": "disabled_by_default_waiting_authorization",
         },
         "test_results": test_results,
     }

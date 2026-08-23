@@ -223,8 +223,12 @@ def _quantity_after(text: str, name: str) -> int:
 
 def _controlled_parse(
     db: Session, text: str, now: datetime | None = None
-) -> tuple[dict | None, list[dict], dict]:
+) -> tuple[dict | None, list[dict], dict, str]:
     model_result = stage4_model_service.run(text)
+    working_text = (
+        stage4_model_service.redact_pii(text)
+        if model_result["status"] == "pii_fallback" else text
+    )
     model_candidate = model_result.get("candidate")
     model_runtime = {
         "attempted": model_result["attempted"],
@@ -232,32 +236,32 @@ def _controlled_parse(
         "intent": model_candidate.intent if model_candidate else None,
     }
     customer, surface = _resolve_customer(
-        db, text, model_candidate.customer_query if model_candidate else None
+        db, working_text, model_candidate.customer_query if model_candidate else None
     )
     if customer is None:
-        product_management = _parse_product_management(db, text)
+        product_management = _parse_product_management(db, working_text)
         if product_management:
             product_management["model_runtime"] = model_runtime
-            return product_management, [], model_runtime
+            return product_management, [], model_runtime, working_text
         return None, [], {
             **model_runtime,
             "clarification_question": (
                 model_candidate.clarification_question
                 if model_candidate and model_candidate.needs_clarification else None
             ),
-        }
+        }, working_text
     actions = []
     mentions = [{"entity_type": "customer", "entity_id": customer.id, "surface_text": surface}]
     for service in service_repo.list_services(db):
-        if service.status != "active" or service.name not in text:
+        if service.status != "active" or service.name not in working_text:
             continue
-        action_type = "record_one_time_service" if "一次性" in text else "consume_service"
+        action_type = "record_one_time_service" if "一次性" in working_text else "consume_service"
         actions.append(
             {
                 "type": action_type,
                 "service_id": service.id,
                 "service_name": service.name,
-                "quantity": _quantity_after(text, service.name),
+                "quantity": _quantity_after(working_text, service.name),
             }
         )
         mentions.append({"entity_type": "service", "entity_id": service.id, "surface_text": service.name})
@@ -266,12 +270,15 @@ def _controlled_parse(
         item.model_dump() for item in (model_candidate.facts if model_candidate else [])
     ]
     facts, fact_source = extract_fact_candidates(
-        db, customer.id, text, validated_model_items=model_facts
+        db, customer.id, working_text, validated_model_items=model_facts
     )
     for fact in facts:
         actions.append({"type": "upsert_customer_fact", **fact})
 
-    delete_match = re.search(r"(?:把)?[^，。；;]{0,12}?([^，。；;]{1,12}?)(?:标签|事实)?(?:删掉|删除|移除)", text)
+    delete_match = re.search(
+        r"(?:把)?[^，。；;]{0,12}?([^，。；;]{1,12}?)(?:标签|事实)?(?:删掉|删除|移除)",
+        working_text,
+    )
     if delete_match:
         keyword = delete_match.group(1).replace(customer.display_name, "").replace(surface or "", "").strip("的 ")
         for fact in fact_repo.list_current(db, customer.id):
@@ -282,7 +289,7 @@ def _controlled_parse(
                 actions.append({
                     "type": "delete_customer_fact", "fact_id": fact.id,
                     "fact_type": fact.fact_type, "display_value": fact.display_value,
-                    "evidence_text": text,
+                    "evidence_text": working_text,
                 })
 
     model_purchase = model_candidate.product_purchase if model_candidate else None
@@ -297,11 +304,11 @@ def _controlled_parse(
             "extraction_source": "model",
         }
     else:
-        purchase = extract_product_purchase(text)
+        purchase = extract_product_purchase(working_text)
         if purchase:
             purchase.update({
                 "brand": None, "specification": None,
-                "evidence_text": text, "confidence": None,
+                "evidence_text": working_text, "confidence": None,
                 "extraction_source": "rule",
             })
     product_match = None
@@ -330,8 +337,11 @@ def _controlled_parse(
                 model_candidate.clarification_question
                 if model_candidate and model_candidate.needs_clarification else None
             ),
-        }
-    resolved = resolve_relative_date(text, now.astimezone(shanghai_now().tzinfo) if now and now.tzinfo else now)
+        }, working_text
+    resolved = resolve_relative_date(
+        working_text,
+        now.astimezone(shanghai_now().tzinfo) if now and now.tzinfo else now,
+    )
     for action in actions:
         if action["type"] in {"consume_service", "record_one_time_service", "record_product_purchase"}:
             action["occurred_on"] = resolved["date"]
@@ -354,7 +364,7 @@ def _controlled_parse(
         "needs_clarification": False,
         "clarification_question": None,
     }
-    return parsed, mentions, model_runtime
+    return parsed, mentions, model_runtime, working_text
 
 
 def _parse_product_management(db: Session, text: str) -> dict | None:
@@ -457,11 +467,12 @@ def chat_turn(db: Session, data, now: datetime | None = None) -> dict:
     thread = get_or_create_thread(db)
     session = get_or_create_session(db, thread, now)
     text = data.text.strip()
-    parsed, mentions, parse_runtime = _controlled_parse(db, text, now)
+    parsed, mentions, parse_runtime, persisted_text = _controlled_parse(db, text, now)
     created_at = _utc_naive(now)
     owner_message = Message(
         tenant_id=get_current_tenant_id(), session_id=session.id, role="owner",
-        content=text, message_type="text", request_id=data.request_id, created_at=created_at,
+        content=persisted_text, message_type="text", request_id=data.request_id,
+        created_at=created_at,
     )
     db.add(owner_message)
     db.flush()
@@ -489,7 +500,7 @@ def chat_turn(db: Session, data, now: datetime | None = None) -> dict:
     expires_at = created_at + timedelta(hours=24)
     proposal_status = "resolving" if parsed.get("resolution_required") else "pending"
     proposal = proposal_repo.create_proposal(
-        db, text, json.dumps(parsed, ensure_ascii=False), None, proposal_status,
+        db, persisted_text, json.dumps(parsed, ensure_ascii=False), None, proposal_status,
         owner_id=get_current_owner_id(), thread_id=thread.id, request_id=data.request_id,
         idempotency_key=data.idempotency_key, expires_at=expires_at,
         resolved_absolute_dates=json.dumps(parsed["resolved_absolute_dates"], ensure_ascii=False),

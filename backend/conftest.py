@@ -20,6 +20,7 @@ from app.main import app
 def disable_paid_model_calls(monkeypatch):
     """自动测试默认禁用真实模型；需要模型的用例显式注入 MockModel。"""
     monkeypatch.setenv("DEEPSEEK_API_KEY", "")
+    monkeypatch.setenv("ENABLE_V2_REAL_MODEL", "false")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
