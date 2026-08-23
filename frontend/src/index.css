@@ -107,6 +107,27 @@ button:disabled {
   cursor: not-allowed;
 }
 
+:where(a, button, input, select, textarea):focus-visible {
+  outline: 3px solid #1d4ed8;
+  outline-offset: 2px;
+}
+
+.stage8-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stage8-nav a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: #eef3ff;
+  text-decoration: none;
+}
+
 button.danger {
   background: #c0392b;
 }

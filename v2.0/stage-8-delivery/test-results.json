@@ -1,0 +1,37 @@
+{
+  "stage": 8,
+  "status": "通过",
+  "capabilities": {
+    "stage1_to_7_regression": true,
+    "multi_day_and_cross_device": true,
+    "network_failure_recovery": true,
+    "model_and_index_degrade": true,
+    "backup_restore_rehearsal": true,
+    "responsive_desktop_mobile": true,
+    "security_headers": true,
+    "accessibility_baseline": true
+  },
+  "backend": {"passed": 288, "warning": "1条既有Starlette TestClient弃用警告"},
+  "frontend": {"passed": 53, "files": 11},
+  "build": {"status": "通过", "modules_transformed": 82},
+  "migration": "0020_stage7_evaluation_release",
+  "database": {"integrity": "ok", "foreign_key_errors": 0},
+  "backup_restore": {
+    "status": "通过",
+    "core_tables": 30,
+    "source_digest": "ecde1c6ea0836d80b51d49ed1fa3314757ef2bc24bfeb49a76a71fc47d66823d",
+    "restored_digest": "ecde1c6ea0836d80b51d49ed1fa3314757ef2bc24bfeb49a76a71fc47d66823d"
+  },
+  "performance": {
+    "requests_per_endpoint": 40,
+    "worst_p95_ms": 1.37,
+    "scope": "127.0.0.1 restored SQLite copy"
+  },
+  "browser": {"status": "通过", "desktop": "1440x1000", "mobile": "390x844", "wechat_equivalent": "390x844 MicroMessenger UA"},
+  "accessibility": {"status": "通过", "scope": "responsive, heading, aria state, keyboard baseline"},
+  "security_headers": "通过",
+  "external_calls": {"chat_model": 0, "embedding": 0, "message_send": 0},
+  "real_model_enabled": false,
+  "production_authentication": false,
+  "public_deployment": false
+}

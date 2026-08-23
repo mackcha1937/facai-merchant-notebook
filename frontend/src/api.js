@@ -111,6 +111,7 @@ export const api = {
   getEvaluationAudits: () => request('/api/admin/evaluations/audits'),
   publishEvaluationRelease: (data) => request('/api/admin/evaluations/releases/publish', { method: 'POST', body: JSON.stringify(data) }),
   rollbackEvaluationRelease: (data) => request('/api/admin/evaluations/releases/rollback', { method: 'POST', body: JSON.stringify(data) }),
+  getStage8Status: () => request('/api/v2-stage8/status'),
   createCustomerFactProposal: (customerId, data) => request(`/api/owner/customers/${customerId}/facts/proposal`, { method: 'POST', body: JSON.stringify(data) }),
   resolveProposalProduct: (id, data) => request(`/api/owner/proposals/${id}/resolve-product`, { method: 'POST', body: JSON.stringify(data) }),
   getStage4Status: () => request('/api/v2-stage4/status'),

@@ -26,6 +26,7 @@ from app.api.routes import (
     v2_stage5,
     v2_stage6,
     v2_stage7,
+    v2_stage8,
 )
 from app.core.config import get_settings
 from app.core.database import init_db
@@ -72,6 +73,27 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def security_response_headers(request: Request, call_next):
+    """本地与远程共用的最小响应安全基线；HTTPS时才发送HSTS。"""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Permissions-Policy"] = "camera=(), geolocation=(), microphone=(self)"
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
+    elif request.url.path not in {"/docs", "/redoc", "/openapi.json"}:
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; "
+            "object-src 'none'; form-action 'self'; img-src 'self' data:; "
+            "style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'"
+        )
+    if request.url.scheme == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
+
 @app.exception_handler(DomainError)
 async def domain_error_handler(_request: Request, exc: DomainError):
     return JSONResponse(status_code=400, content={"detail": str(exc)})
@@ -112,6 +134,7 @@ app.include_router(v2_stage4.router)
 app.include_router(v2_stage5.router)
 app.include_router(v2_stage6.router)
 app.include_router(v2_stage7.router)
+app.include_router(v2_stage8.router)
 
 # ---- 前后端合并：后端托管前端构建产物（单端口运行） ----
 FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"

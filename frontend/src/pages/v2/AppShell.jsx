@@ -415,6 +415,7 @@ export default function AppShell({ initialView = 'chat' }) {
         <LeftNav active={activeKey} onNavigate={navigateTo} />
 
         <main className="v2-center">
+          <h1 className="v2-sr-only">发财客户管理工作台</h1>
           {dataError && <div className="v2-inline-error">{dataError}</div>}
           <ChatView
             draftInput={draftInput}

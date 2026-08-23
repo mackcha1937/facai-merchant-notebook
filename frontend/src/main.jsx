@@ -21,6 +21,7 @@ import VerifyV2Stage4 from './pages/v2/VerifyV2Stage4.jsx'
 import VerifyV2Stage5 from './pages/v2/VerifyV2Stage5.jsx'
 import VerifyV2Stage6 from './pages/v2/VerifyV2Stage6.jsx'
 import VerifyV2Stage7 from './pages/v2/VerifyV2Stage7.jsx'
+import VerifyV2Stage8 from './pages/v2/VerifyV2Stage8.jsx'
 import AdminKnowledge from './pages/v2/AdminKnowledge.jsx'
 import AdminEvaluations from './pages/v2/AdminEvaluations.jsx'
 import AppShell from './pages/v2/AppShell.jsx'
@@ -48,6 +49,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <Route path="/verify/v2-stage-5" element={<VerifyV2Stage5 />} />
         <Route path="/verify/v2-stage-6" element={<VerifyV2Stage6 />} />
         <Route path="/verify/v2-stage-7" element={<VerifyV2Stage7 />} />
+        <Route path="/verify/v2-stage-8" element={<VerifyV2Stage8 />} />
         <Route path="/admin/knowledge" element={<AdminKnowledge />} />
         <Route path="/admin/evaluations" element={<AdminEvaluations />} />
         <Route path="/app/chat" element={<AppShell initialView="chat" />} />
