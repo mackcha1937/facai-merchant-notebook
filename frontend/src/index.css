@@ -119,7 +119,8 @@ button.link {
 
 /* 输入 */
 input,
-select {
+select,
+textarea {
   padding: 8px 10px;
   border: 1px solid #d0d5dd;
   border-radius: 6px;
@@ -129,6 +130,11 @@ select {
 
 input:focus,
 select:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+textarea:focus {
   outline: none;
   border-color: #2563eb;
 }

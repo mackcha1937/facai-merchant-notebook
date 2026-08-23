@@ -47,6 +47,15 @@ class ConfirmAction(BaseModel):
     total_count: int | None = None
     purchased_on: str | None = None
     occurred_on: str | None = None
+    entity_type: str | None = None
+    entity_id: int | None = None
+    title: str | None = None
+    content: str | None = None
+    source_type: str | None = None
+    source_name: str | None = None
+    knowledge_checksum: str | None = None
+    current_version_id: int | None = None
+    reason: str | None = None
 
 
 class ConfirmRequest(BaseModel):

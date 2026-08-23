@@ -35,6 +35,10 @@ def _action_summary(action: dict) -> str:
         return f"撤销客户事实：{action['display_value']}"
     if kind == "record_product_purchase":
         return f"购买{action.get('canonical_name') or action.get('product_name')} {action.get('quantity', 1)}件"
+    if kind == "publish_knowledge":
+        return f"发布{action.get('entity_type')}知识：{action.get('title')}"
+    if kind == "withdraw_knowledge":
+        return f"撤回{action.get('entity_type')}知识"
     return kind
 
 

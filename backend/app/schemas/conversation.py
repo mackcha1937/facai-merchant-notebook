@@ -80,3 +80,30 @@ class CustomerFactProposalRequest(BaseModel):
     facts: list[CustomerFactProposalItem] = Field(min_length=1, max_length=20)
     request_id: str = Field(min_length=8, max_length=64)
     idempotency_key: str = Field(min_length=8, max_length=128)
+
+
+class KnowledgeProposalRequest(BaseModel):
+    entity_type: str = Field(pattern="^(product|service)$")
+    entity_id: int = Field(ge=1)
+    title: str = Field(min_length=1, max_length=200)
+    content: str = Field(min_length=1, max_length=6000)
+    source_type: str = Field(default="owner_confirmed", max_length=30)
+    source_name: str = Field(min_length=1, max_length=200)
+    aliases: list[str] = Field(default_factory=list, max_length=20)
+    request_id: str = Field(min_length=8, max_length=64)
+    idempotency_key: str = Field(min_length=8, max_length=128)
+
+
+class KnowledgeWithdrawRequest(BaseModel):
+    entity_type: str = Field(pattern="^(product|service)$")
+    entity_id: int = Field(ge=1)
+    reason: str = Field(min_length=2, max_length=500)
+    request_id: str = Field(min_length=8, max_length=64)
+    idempotency_key: str = Field(min_length=8, max_length=128)
+
+
+class KnowledgeRetrieveRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=500)
+    entity_type: str | None = Field(default=None, pattern="^(product|service)$")
+    entity_id: int | None = Field(default=None, ge=1)
+    limit: int = Field(default=5, ge=3, le=5)

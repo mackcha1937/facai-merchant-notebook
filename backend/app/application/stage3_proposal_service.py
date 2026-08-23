@@ -154,6 +154,10 @@ def confirm(db: Session, proposal_id: int, data, now: datetime | None = None) ->
         )
 
     parsed = _parsed(proposal)
+    if any(action.get("type") in {"publish_knowledge", "withdraw_knowledge"} for action in parsed["actions"]):
+        from app.core.rbac import require_admin
+
+        require_admin()
     before = _load_json(proposal.authority_snapshot_json, {})
     try:
         current_snapshot = build_authority_snapshot(db, parsed)
@@ -334,6 +338,10 @@ def _action_summary(action: dict) -> str:
         return f"新增产品草稿：{action.get('canonical_name', '未填写')}"
     if action_type == "merge_product":
         return "合并重复产品"
+    if action_type == "publish_knowledge":
+        return f"发布{action.get('entity_type')}知识：{action.get('title', '未填写')}"
+    if action_type == "withdraw_knowledge":
+        return f"撤回{action.get('entity_type')}知识"
     return f"{action.get('service_name', action_type)} {action.get('quantity', 1)} 次"
 
 

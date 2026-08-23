@@ -1,0 +1,20 @@
+{
+  "status": "通过",
+  "backend": "252 passed（含阶段1—4全回归与28项阶段5知识/RAG/Migration验收）",
+  "frontend": "42 passed（8个测试文件）",
+  "build": "Vite生产构建通过（77 modules transformed）",
+  "migration_cycle": "0017 → 0018 → 0017 → 0018，通过",
+  "integrity": "三个检查点 integrity_check=ok，foreign_key_check无错误",
+  "data_integrity": {
+    "before_hash": "544e357a801bde9765b4665526ec8747bf21fdc2875ba7bc7a23c010f5b7165b",
+    "after_hash": "544e357a801bde9765b4665526ec8747bf21fdc2875ba7bc7a23c010f5b7165b",
+    "counts": "customers4 / services5 / packages3 / ledger4 / facts0 / products1 / aliases0 / proposals8 / documents0 / chunks0 / embeddings0"
+  },
+  "browser": "Chromium桌面1440×1000与手机390×844通过；店主只读状态无技术写控件，手机无横向溢出；虚构5文档/5 Chunk/5本地索引检索通过",
+  "security": "tenant/entity/confirmed/active/current-version强过滤；title/content双重门禁；PII查询零Embedding调用；旧版/撤回/未确认/停用/跨店零泄漏",
+  "embedding": "facai-local / char-ngram-sha256-v1 / 32维；checksum幂等；不同维度不混用",
+  "external_calls": "DeepSeek 0；外部Embedding 0；模型下载0",
+  "stage6": "未开始：Recommendation、Top3、提醒、话术、反馈均未建设",
+  "sensitive_scan": "通过；源码、测试、前端产物与阶段5文档无真实Key/Bearer凭据命中（已识别并排除既有脱敏测试中的短占位符）",
+  "diff_check": "通过"
+}

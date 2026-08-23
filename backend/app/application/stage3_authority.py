@@ -89,6 +89,12 @@ def build_authority_snapshot(db: Session, parsed: dict) -> dict:
             target = product_repo.get_product(db, action.get("target_product_id"), include_replaced=True)
             item["source"] = _product_snapshot(source, action.get("source_product_id"))
             item["target"] = _product_snapshot(target, action.get("target_product_id"))
+        if action.get("type") in {"publish_knowledge", "withdraw_knowledge"}:
+            from app.application.knowledge_service import authority_state
+
+            item["knowledge_authority"] = authority_state(
+                db, action.get("entity_type"), action.get("entity_id")
+            )
         snapshot["actions"].append(item)
     return snapshot
 

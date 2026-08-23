@@ -191,6 +191,11 @@ def _resolve_consume(db: Session, customer: Customer, action):
 def _validate_action(db: Session, customer: Customer, action) -> dict:
     action_type = action.type
 
+    if action_type in {"publish_knowledge", "withdraw_knowledge"}:
+        from app.application.knowledge_service import validate_action
+
+        return validate_action(db, action)
+
     if action_type == "create_package":
         if action.service_id is None:
             return _fail("create_package", "购买套餐需要选择服务项目")
@@ -329,6 +334,11 @@ def _fail(action_type, error, candidates=None):
 def _execute_action(db: Session, customer: Customer, action, proposal) -> dict:
     action_type = action.type
     occurred_on = action.occurred_on or _today()
+
+    if action_type in {"publish_knowledge", "withdraw_knowledge"}:
+        from app.application.knowledge_service import execute_action
+
+        return execute_action(db, action, proposal)
 
     if action_type == "create_package":
         return _do_create_package(db, customer, action, proposal)

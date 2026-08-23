@@ -1,6 +1,5 @@
 // 管理与设置详情（第二级）。AI运行状态为只读：无输入框、开关、保存按钮、API Key。
 import { useState } from 'react'
-import { mockAiStatus } from '../../fixtures/mock/index.js'
 
 const GROUP_DETAIL = {
   products_services: {
@@ -32,7 +31,7 @@ const GROUP_DETAIL = {
   },
 }
 
-export default function ManageDetailView({ group, onBack, products = [], onCreateProduct, onMergeProducts }) {
+export default function ManageDetailView({ group, onBack, products = [], onCreateProduct, onMergeProducts, knowledgeStatus, knowledge = [] }) {
   const detail = GROUP_DETAIL[group?.id] || GROUP_DETAIL.products_services
   const [draft, setDraft] = useState({ canonical_name: '', brand: '', specification: '' })
   const [merge, setMerge] = useState({ source_product_id: '', target_product_id: '' })
@@ -83,16 +82,29 @@ export default function ManageDetailView({ group, onBack, products = [], onCreat
   }
 
   if (detail.readOnly) {
+    const status = knowledgeStatus || {
+      knowledge_complete_count: 0,
+      embedding: { status: '加载中', indexed: 0, failed: 0 },
+      rag: { status: '加载中', result_limit: '3-5' },
+      recommendation_built: false,
+    }
     return (
       <div className="v2-block v2-manage" data-testid="manage-detail-view">
         <div className="v2-path"><button className="v2-link" onClick={onBack}>← 返回管理与设置</button></div>
         <div className="v2-record-title">{detail.title}</div>
-        <div className="v2-kv"><span className="k">对话模型</span><span className="v">{mockAiStatus.chat_model.id} · {mockAiStatus.chat_model.status}</span></div>
-        <div className="v2-kv"><span className="k">Embedding</span><span className="v">{mockAiStatus.embedding.status}</span></div>
-        <div className="v2-kv"><span className="k">RAG</span><span className="v">{mockAiStatus.rag.status}</span></div>
-        <div className="v2-kv"><span className="k">推荐</span><span className="v">{mockAiStatus.recommendation.status}</span></div>
-        <div className="v2-kv"><span className="k">最近检查</span><span className="v">{mockAiStatus.last_check_at}</span></div>
-        <p className="v2-hint">本页只读，无输入框、开关、保存按钮，也不返回 API Key 或提示词全文。</p>
+        <div className="v2-kv"><span className="k">知识完整</span><span className="v">{status.knowledge_complete_count} 个当前版本</span></div>
+        <div className="v2-kv"><span className="k">Embedding</span><span className="v">{status.embedding.status} · 已索引 {status.embedding.indexed} · 失败 {status.embedding.failed}</span></div>
+        <div className="v2-kv"><span className="k">RAG</span><span className="v">{status.rag.status} · 每次最多 {status.rag.result_limit} 条证据</span></div>
+        <div className="v2-kv"><span className="k">推荐</span><span className="v">{status.recommendation_built ? '已开启' : '未建设（阶段6边界）'}</span></div>
+        <div className="v2-section">
+          <strong>当前已发布知识与来源</strong>
+          {knowledge.map((item) => <div className="v2-kv" key={item.document_id}>
+            <span className="k">{item.entity_type} #{item.entity_id} · v{item.knowledge_version}</span>
+            <span className="v">{item.source_name} · {item.index_status}</span>
+          </div>)}
+          {!knowledge.length && <div className="v2-state">知识不足：暂无已确认且当前有效的知识</div>}
+        </div>
+        <p className="v2-hint">本页只读，无输入框、开关、保存按钮；不返回模型、Embedding、RAG 参数、API Key 或提示词全文。</p>
       </div>
     )
   }

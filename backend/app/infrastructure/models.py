@@ -256,8 +256,19 @@ class ProductKnowledgeVersion(Base):
     owner_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     embedding_status: Mapped[str] = mapped_column(String(30), default="pending", nullable=False)
+    status: Mapped[str] = mapped_column(String(30), default="draft", nullable=False)
+    checksum: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    source_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    supersedes_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "entity_id", "version", name="uq_product_knowledge_versions_tenant_entity_version"),
+    )
 
 
 class ServiceKnowledgeVersion(Base):
@@ -272,8 +283,19 @@ class ServiceKnowledgeVersion(Base):
     owner_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     embedding_status: Mapped[str] = mapped_column(String(30), default="pending", nullable=False)
+    status: Mapped[str] = mapped_column(String(30), default="draft", nullable=False)
+    checksum: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    source_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    supersedes_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "entity_id", "version", name="uq_service_knowledge_versions_tenant_entity_version"),
+    )
 
 
 class KnowledgeDocument(Base):
@@ -288,8 +310,36 @@ class KnowledgeDocument(Base):
     metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(30), default="draft", nullable=False)
     checksum: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    source_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    source_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    confirmed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "entity_type", "entity_id", "knowledge_version", name="uq_knowledge_documents_entity_version"),
+    )
+
+
+class KnowledgeChunk(Base):
+    __tablename__ = "knowledge_chunks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    document_id: Mapped[int] = mapped_column(ForeignKey("knowledge_documents.id"), nullable=False)
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(30), default="active", nullable=False)
+    checksum: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "document_id", "chunk_index", name="uq_knowledge_chunks_document_index"),
+    )
 
 
 class EmbeddingRecord(Base):
@@ -298,13 +348,25 @@ class EmbeddingRecord(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     tenant_id: Mapped[int] = mapped_column(Integer, nullable=False)
     document_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    chunk_id: Mapped[int | None] = mapped_column(ForeignKey("knowledge_chunks.id"), nullable=True)
+    knowledge_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
     embedding_provider: Mapped[str] = mapped_column(String(50), nullable=False)
     embedding_model: Mapped[str] = mapped_column(String(100), nullable=False)
     dimension: Mapped[int | None] = mapped_column(Integer, nullable=True)
     vector_ref: Mapped[str | None] = mapped_column(String(500), nullable=True)
     checksum: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    status: Mapped[str] = mapped_column(String(30), default="pending", nullable=False)
+    error_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
     indexed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id", "document_id", "embedding_provider", "embedding_model", "checksum",
+            name="uq_embedding_records_checksum_model",
+        ),
+    )
 
 
 # ---------------- V2 会话 / 推荐 / 发布（只建结构） ----------------

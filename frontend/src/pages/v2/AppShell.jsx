@@ -48,6 +48,8 @@ export default function AppShell({ initialView = 'chat' }) {
   const [records, setRecords] = useState({})
   const [serviceDetails, setServiceDetails] = useState({})
   const [products, setProducts] = useState([])
+  const [knowledgeStatus, setKnowledgeStatus] = useState(null)
+  const [knowledge, setKnowledge] = useState([])
   const [chatRefreshToken, setChatRefreshToken] = useState(0)
   const [dataError, setDataError] = useState('')
   const savedDraftRef = useRef('')
@@ -77,6 +79,11 @@ export default function AppShell({ initialView = 'chat' }) {
     try { setProducts(await api.getProducts()) } catch (error) { setDataError(error.message) }
   }, [])
   useEffect(() => { refreshProducts() }, [refreshProducts])
+  useEffect(() => {
+    Promise.all([api.getOwnerKnowledgeStatus(), api.getOwnerKnowledge()])
+      .then(([status, rows]) => { setKnowledgeStatus(status); setKnowledge(rows) })
+      .catch((error) => setDataError(error.message))
+  }, [])
 
   const loadRecord = useCallback(async (customerId) => {
     try {
@@ -287,6 +294,7 @@ export default function AppShell({ initialView = 'chat' }) {
         return <ManageDetailView
           group={mockManageGroups.find((g) => g.id === current.groupId)} onBack={back}
           products={products} onCreateProduct={createProductProposal} onMergeProducts={mergeProductProposal}
+          knowledgeStatus={knowledgeStatus} knowledge={knowledge}
         />
       case VIEW_TYPES.CHAT:
       default:

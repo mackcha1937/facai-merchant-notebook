@@ -79,6 +79,17 @@ export const api = {
   getProduct: (id) => request(`/api/owner/products/${id}`),
   createProductDraftProposal: (data) => request('/api/owner/products/draft-proposal', { method: 'POST', body: JSON.stringify(data) }),
   createProductMergeProposal: (data) => request('/api/owner/products/merge-proposal', { method: 'POST', body: JSON.stringify(data) }),
+
+  // 阶段5知识链路：店主只读证据；管理员发布治理
+  getStage5Status: () => request('/api/v2-stage5/status'),
+  getOwnerKnowledgeStatus: () => request('/api/owner/knowledge/status'),
+  getOwnerKnowledge: () => request('/api/owner/knowledge'),
+  retrieveKnowledge: (data) => request('/api/owner/knowledge/retrieve', { method: 'POST', body: JSON.stringify(data) }),
+  getAdminKnowledge: () => request('/api/admin/knowledge'),
+  createAdminKnowledgeProposal: (data) => request('/api/admin/knowledge/proposals', { method: 'POST', body: JSON.stringify(data) }),
+  createAdminKnowledgeWithdrawProposal: (data) => request('/api/admin/knowledge/withdraw-proposals', { method: 'POST', body: JSON.stringify(data) }),
+  confirmAdminKnowledgeProposal: (id, data) => request(`/api/admin/knowledge/proposals/${id}/confirm`, { method: 'POST', body: JSON.stringify(data) }),
+  reindexKnowledge: (entityType, entityId) => request(`/api/admin/knowledge/${entityType}/${entityId}/reindex`, { method: 'POST' }),
   createCustomerFactProposal: (customerId, data) => request(`/api/owner/customers/${customerId}/facts/proposal`, { method: 'POST', body: JSON.stringify(data) }),
   resolveProposalProduct: (id, data) => request(`/api/owner/proposals/${id}/resolve-product`, { method: 'POST', body: JSON.stringify(data) }),
   getStage4Status: () => request('/api/v2-stage4/status'),
