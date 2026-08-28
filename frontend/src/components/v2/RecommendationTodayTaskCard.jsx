@@ -22,7 +22,7 @@ function evidenceLabel(item) {
 }
 
 export default function RecommendationTodayTaskCard({
-  tasks = [], groupLabels = {}, onRead, onHandle, onBack,
+  tasks = [], groupLabels = {}, onRead, onHandle,
   onRecommendationAction, onRewrite, onCopy, savedScroll = 0, onScrollChange,
 }) {
   const counts = computeTodayTaskCounts(tasks)
@@ -52,7 +52,6 @@ export default function RecommendationTodayTaskCard({
   return <div className="v2-block v2-today" data-testid="today-task-card">
     <div className="v2-block-head">
       <div><div className="v2-block-kicker">今日事项</div><div className="v2-muted">未处理 {counts.unresolved_count} · 未查看 {counts.unread_count}</div></div>
-      <button className="v2-link" onClick={onBack}>返回</button>
     </div>
     <p className="v2-hint">打开列表不会批量清除“新”；请逐条打开。查看或复制话术不等于已联系。</p>
     {notice && <div className="v2-inline-notice" role="status">{notice}</div>}

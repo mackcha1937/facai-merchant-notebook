@@ -13,7 +13,7 @@ const SORTS = [
   { key: 'recent_update', label: '最近更新' },
 ]
 
-export default function CustomerIndexCard({ customers = [], onOpenCustomer, onBack, saved = {}, onStateChange }) {
+export default function CustomerIndexCard({ customers = [], onOpenCustomer, saved = {}, onStateChange }) {
   const [query, setQuery] = useState(saved.query || '')
   const [filter, setFilter] = useState(saved.filter || 'all')
   const [sort, setSort] = useState(saved.sort || 'recent_consumption')
@@ -50,14 +50,13 @@ export default function CustomerIndexCard({ customers = [], onOpenCustomer, onBa
     <div className="v2-block v2-index" data-testid="customer-index-card">
       <div className="v2-block-head">
         <div>
-          <div className="v2-block-kicker">全部客户</div>
-          <div className="v2-muted">{sorted.length} 位 · 权威客户数据</div>
+          <div className="v2-block-kicker">客户档案</div>
+          <div className="v2-muted">{sorted.length} 位客户 · 数据实时同步</div>
         </div>
-        <button className="v2-link" onClick={onBack}>返回对话</button>
       </div>
 
       <div className="v2-search">
-        <span>⌕</span>
+        <span className="v2-search-mark" aria-hidden="true">⌕</span>
         <input
           placeholder="搜索客户或别名"
           value={query}
@@ -79,7 +78,7 @@ export default function CustomerIndexCard({ customers = [], onOpenCustomer, onBa
 
       <div className="v2-index-list" ref={listRef} onScroll={() => report({ scrollPosition: listRef.current?.scrollTop || 0 })}>
         {sorted.map((c) => (
-          <button key={c.id} data-customer-id={c.id} className="v2-candidate" onClick={() => { report({ scrollPosition: listRef.current?.scrollTop || 0 }); onOpenCustomer(c) }}>
+          <button key={c.id} data-customer-id={c.id} className="v2-candidate" aria-label={`查看 ${c.display_name} 的客户详情`} onClick={() => { report({ scrollPosition: listRef.current?.scrollTop || 0 }); onOpenCustomer(c) }}>
             <span className="v2-avatar">{c.display_name.slice(0, 1)}</span>
             <span className="v2-candidate-main">
               <strong>{c.display_name}{(c.aliases || []).length > 0 && ` · ${c.aliases.join('、')}`}</strong>

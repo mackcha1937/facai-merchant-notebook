@@ -1,38 +1,76 @@
-# 美容店智能客户账本 MVP 文档包
+# 发财·智能客户经营助手 V2
 
-版本：v1.0  
-状态：开发基线·已确认  
-日期：2026-08-20
+版本：v2.0 本地 MVP
 
-## 文档索引
+状态：阶段 0～8 本地开发与总验收已完成
 
-1. [项目立项文档](./01-project-charter.md)
-2. [产品需求文档（PRD）](./02-product-requirements.md)
-3. [后端分层与分阶段开发文档](./03-backend-development-plan.md)
-4. [系统提示词管理规范](./04-system-prompt-management.md)
-5. [前端开发文档](./05-frontend-development-spec.md)
-6. [已确认交互原型](./design-reference/minimal-chat-customer-flow.html)
+最近验收：2026-08-28
 
-## 使用说明
+## 项目简介
 
-- 本文档包只定义项目目标、需求和开发方式，不代表已经开始开发。
-- 当前版本是本地电脑测试版，不公开部署，不使用邀请码，不录入真实客户敏感信息。
-- 五份项目文档均属于同一套v1.0开发基线；实现时不得使用旧原型覆盖文档中的最新规则。
-- 正式开发必须在用户明确回复“确认开始开发”后才开始。
-- 开发严格按阶段进行。每个阶段完成后，启动本地临时验证页面，提供验证地址和验收清单，然后暂停；只有用户确认通过后才能进入下一阶段。
-- 当前阶段性地址均为本机地址，只能在运行项目的电脑上访问。未来如需手机或远程访问，需另行确认部署方案与安全要求。
+“发财”是面向美容店店主的本地智能客户经营助手。在 v1 准确账本能力上，V2 增加了多日对话、客户事实、产品实体、知识库 RAG、客户跟进推荐、反馈闭环和 AI 测评发布治理。
 
-## 当前模型配置（待连通性验证）
+当前版本仅供本机测试：未公开部署、未接生产登录、未启用外部 Embedding 或外部消息发送。真实 DeepSeek 模型默认关闭，只有在明确授权并手动开启后才会调用。
+
+## 当前完成度
+
+- 阶段 0～8 的代码、数据库迁移和交付报告已完成；
+- 店主端支持对话、今日事项、客户账本、服务/产品与知识管理；
+- 管理员端支持 AI 测评、版本发布、回滚和审计；
+- 所有写操作通过结构化 Proposal 确认后写入；
+- 具备租户隔离、角色权限、失败降级、安全响应头和 SQLite 备份恢复校验；
+- 最新基线为后端 288 项、前端 60 项自动测试全部通过；
+- 当前数据库迁移版本为 `0020_stage7_evaluation_release`。
+
+## 技术栈
 
 ```text
-API Base URL: https://api.deepseek.com
-Model ID: deepseek-v4-pro
-API Key: 仅保存在后端本地 .env 文件中，不进入文档、前端或版本库
-V2 真实模型开关: `ENABLE_V2_REAL_MODEL=false`（默认关闭）
+前端：React 18 + Vite + React Router
+后端：FastAPI + SQLAlchemy + Alembic
+本地数据库：SQLite
+对话模型：可选 DeepSeek 适配器（默认关闭真实调用）
+Embedding：本地可替换适配器
+运行方式：前后端分离开发，或由 FastAPI 托管前端构建产物
 ```
 
-模型 ID 必须在开发第 0 阶段通过最小请求验证。若接口拒绝该模型 ID，应暂停并请用户核对，不得自行猜测或替换。
+## 快速启动
 
-V2 主对话只有在 `DEEPSEEK_API_KEY` 已配置且
-`ENABLE_V2_REAL_MODEL=true` 时才会构造真实 `DeepSeekAdapter`。该开关仅能在
-获得单独付费调用授权后手动开启；配置 Key 本身不代表授权。
+推荐使用合并版，只开放一个本地端口：
+
+```bash
+./start-merged.sh
+```
+
+启动后访问：
+
+- 产品首页：<http://127.0.0.1:8001/>
+- 阶段 8 总验收：<http://127.0.0.1:8001/verify/v2-stage-8>
+- V2 店主端：<http://127.0.0.1:8001/app/chat>
+- V2 管理员测评台：<http://127.0.0.1:8001/admin/evaluations>
+- API 文档：<http://127.0.0.1:8001/docs>
+
+停止服务：
+
+```bash
+./stop.sh
+```
+
+完整的启动、配置、测试和备份说明见 [运行说明](./运行说明.md)。
+
+## V2 文档与交付记录
+
+- [V2 开发包入口](./v2.0/facai-v2-development-package/00-VSCODE-START-HERE.md)
+- [V2 产品需求](./v2.0/facai-v2-development-package/01-product-requirements.md)
+- [V2 前端交互规范](./v2.0/facai-v2-development-package/02-frontend-interaction-spec.md)
+- [V2 后端架构](./v2.0/facai-v2-development-package/03-backend-architecture.md)
+- [阶段 8 本地总验收总结](./v2.0/stage-8-delivery/01-stage-8-local-acceptance-summary.md)
+- [生产准备度与已知限制](./v2.0/stage-8-delivery/07-production-readiness-known-limitations.md)
+
+根目录的 `01`～`05` 文档以及 `v1.0/` 目录保留为 v1 开发基线和兼容参考，不再代表当前项目进度。
+
+## 安全边界
+
+- API Key 只保存在 `backend/.env`，不得提交到版本库、前端或文档；
+- 当前默认本地店主身份仅用于开发，公开部署前必须建设正式认证并关闭该模式；
+- SQLite 适合本机验收，公开测试前需迁移到 PostgreSQL 并完成并发与容量验证；
+- 如需启用真实模型、外部 Embedding、微信/短信发送或公开部署，必须分别确认费用、隐私和安全方案。

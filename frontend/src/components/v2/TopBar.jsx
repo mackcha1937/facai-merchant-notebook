@@ -3,10 +3,10 @@ export default function TopBar({ onMenu, onToday, unresolvedCount = 0, unreadCou
   return (
     <header className="v2-topbar" data-testid="topbar">
       <button className="v2-menu-btn" onClick={onMenu} aria-label="菜单">☰</button>
-      <div className="v2-brand">
+      <a className="v2-brand" href="/" aria-label="返回产品首页">
         <span className="v2-logo">发</span>
         <strong>发财</strong>
-      </div>
+      </a>
       <button
         className="v2-today-btn"
         onClick={onToday}

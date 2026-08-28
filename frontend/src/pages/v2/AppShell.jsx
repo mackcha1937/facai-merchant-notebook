@@ -7,6 +7,7 @@ import { api } from '../../api.js'
 import TopBar from '../../components/v2/TopBar.jsx'
 import Drawer from '../../components/v2/Drawer.jsx'
 import LeftNav from '../../components/v2/LeftNav.jsx'
+import WorkspaceFrame from '../../components/v2/WorkspaceFrame.jsx'
 import ChatView from '../v2/ChatView.jsx'
 import RecommendationTodayTaskCard from '../../components/v2/RecommendationTodayTaskCard.jsx'
 import CustomerIndexCard from '../../components/v2/CustomerIndexCard.jsx'
@@ -57,7 +58,9 @@ export default function AppShell({ initialView = 'chat' }) {
   const [recommendationTasks, setRecommendationTasks] = useState([])
   const [customers, setCustomers] = useState([])
   const [records, setRecords] = useState({})
+  const [recordErrors, setRecordErrors] = useState({})
   const [serviceDetails, setServiceDetails] = useState({})
+  const [serviceErrors, setServiceErrors] = useState({})
   const [products, setProducts] = useState([])
   const [knowledgeStatus, setKnowledgeStatus] = useState(null)
   const [knowledge, setKnowledge] = useState([])
@@ -134,13 +137,27 @@ export default function AppShell({ initialView = 'chat' }) {
   }, [])
 
   const loadRecord = useCallback(async (customerId) => {
+    setRecordErrors((current) => ({ ...current, [customerId]: '' }))
     try {
       const record = await api.getAuthoritativeCustomerRecord(customerId)
       setRecords((current) => ({ ...current, [customerId]: record }))
       setDataError('')
       return record
     } catch (error) {
-      setDataError(error.message)
+      setRecordErrors((current) => ({ ...current, [customerId]: error.message || '客户档案读取失败' }))
+      return null
+    }
+  }, [])
+
+  const loadServiceDetail = useCallback(async (customerId, serviceId) => {
+    const key = `${customerId}:${serviceId}`
+    setServiceErrors((current) => ({ ...current, [key]: '' }))
+    try {
+      const detail = await api.getCustomerServiceDetail(customerId, serviceId)
+      setServiceDetails((current) => ({ ...current, [key]: detail }))
+      return detail
+    } catch (error) {
+      setServiceErrors((current) => ({ ...current, [key]: error.message || '服务详情读取失败' }))
       return null
     }
   }, [])
@@ -187,13 +204,9 @@ export default function AppShell({ initialView = 'chat' }) {
   const openManagement = useCallback(() => pushView(VIEW_TYPES.MANAGEMENT), [pushView])
   const openCustomerRecord = useCallback((customerId) => {
     pushView(VIEW_TYPES.CUSTOMER_RECORD, { customerId })
-    loadRecord(customerId)
-  }, [loadRecord, pushView])
+  }, [pushView])
   const openServiceDetail = useCallback((customerId, serviceId) => {
     pushView(VIEW_TYPES.CUSTOMER_SERVICE_DETAIL, { customerId, serviceId })
-    api.getCustomerServiceDetail(customerId, serviceId)
-      .then((detail) => setServiceDetails((current) => ({ ...current, [`${customerId}:${serviceId}`]: detail })))
-      .catch((error) => setDataError(error.message))
   }, [pushView])
   const openManageGroup = useCallback((groupId) => pushView(VIEW_TYPES.MANAGEMENT_DETAIL, { groupId }), [pushView])
 
@@ -336,6 +349,15 @@ export default function AppShell({ initialView = 'chat' }) {
     if (active?.customerId && !records[active.customerId]) loadRecord(active.customerId)
   }, [current?.customerId, loadRecord, records])
 
+  useEffect(() => {
+    const active = stackRef.current.current
+    if (active?.viewType !== VIEW_TYPES.CUSTOMER_SERVICE_DETAIL) return
+    const key = `${active.customerId}:${active.serviceId}`
+    if (!serviceDetails[key] && serviceErrors[key] === undefined) {
+      loadServiceDetail(active.customerId, active.serviceId)
+    }
+  }, [current?.serviceId, loadServiceDetail, serviceDetails, serviceErrors])
+
   // ---- 渲染当前工作区视图 ----
   const renderView = () => {
     switch (current.viewType) {
@@ -349,7 +371,6 @@ export default function AppShell({ initialView = 'chat' }) {
             onRecommendationAction={handleRecommendationAction}
             onRewrite={handleRecommendationRewrite}
             onCopy={handleRecommendationCopy}
-            onBack={back}
             savedScroll={current.scrollPosition || 0}
             onScrollChange={(pos) => { current.scrollPosition = pos }}
           />
@@ -359,33 +380,42 @@ export default function AppShell({ initialView = 'chat' }) {
           <CustomerIndexCard
             customers={customers}
             onOpenCustomer={(c) => openCustomerRecord(c.id)}
-            onBack={back}
             saved={{ query: current.query, filter: current.filter, sort: current.sort, scrollPosition: current.scrollPosition }}
             onStateChange={handleCustomerIndexState}
           />
         )
       case VIEW_TYPES.CUSTOMER_RECORD: {
         const record = records[current.customerId]
+        const error = recordErrors[current.customerId]
         return (
-          record ? <CustomerRecordCard
+          error ? <div className="v2-load-failure" role="alert">
+            <strong>客户档案暂时没有打开</strong>
+            <span>{error}</span>
+            <button className="v2-btn" onClick={() => loadRecord(current.customerId)}>重新加载</button>
+          </div> : record ? <CustomerRecordCard
             record={record}
-            onBackToList={back}
             onOpenService={(sid) => openServiceDetail(current.customerId, sid)}
-          /> : <div className="v2-state">正在读取最新权威客户档案…</div>
+          /> : <div className="v2-loading-card" aria-live="polite"><span className="v2-spinner" />正在读取最新客户档案…</div>
         )
       }
       case VIEW_TYPES.CUSTOMER_SERVICE_DETAIL: {
         const record = records[current.customerId]
-        const service = serviceDetails[`${current.customerId}:${current.serviceId}`]
-        return service
-          ? <ServiceDetailCard service={service} customerName={record?.display_name || '客户'} onBack={back} />
-          : <div className="v2-state">正在读取最新权威服务数据…</div>
+        const key = `${current.customerId}:${current.serviceId}`
+        const service = serviceDetails[key]
+        const error = serviceErrors[key]
+        return error ? <div className="v2-load-failure" role="alert">
+          <strong>服务详情暂时没有打开</strong>
+          <span>{error}</span>
+          <button className="v2-btn" onClick={() => loadServiceDetail(current.customerId, current.serviceId)}>重新加载</button>
+        </div> : service
+          ? <ServiceDetailCard service={service} customerName={record?.display_name || '客户'} />
+          : <div className="v2-loading-card" aria-live="polite"><span className="v2-spinner" />正在读取最新服务数据…</div>
       }
       case VIEW_TYPES.MANAGEMENT:
-        return <ManageView onBack={back} onOpenGroup={(g) => openManageGroup(g.id)} />
+        return <ManageView onOpenGroup={(g) => openManageGroup(g.id)} />
       case VIEW_TYPES.MANAGEMENT_DETAIL:
         return <ManageDetailView
-          group={mockManageGroups.find((g) => g.id === current.groupId)} onBack={back}
+          group={mockManageGroups.find((g) => g.id === current.groupId)}
           products={products} onCreateProduct={createProductProposal} onMergeProducts={mergeProductProposal}
           knowledgeStatus={knowledgeStatus} knowledge={knowledge}
           recommendationStatus={stage6Status}
@@ -401,6 +431,12 @@ export default function AppShell({ initialView = 'chat' }) {
     : current.viewType === VIEW_TYPES.CUSTOMER_INDEX ? 'customer_index'
       : current.viewType === VIEW_TYPES.MANAGEMENT || current.viewType === VIEW_TYPES.MANAGEMENT_DETAIL ? 'management'
         : ''
+  const workspaceTitle = current.viewType === VIEW_TYPES.TODAY ? '今日事项'
+    : current.viewType === VIEW_TYPES.CUSTOMER_INDEX ? '全部客户'
+      : current.viewType === VIEW_TYPES.CUSTOMER_RECORD ? (records[current.customerId]?.display_name || '客户档案')
+        : current.viewType === VIEW_TYPES.CUSTOMER_SERVICE_DETAIL ? (serviceDetails[`${current.customerId}:${current.serviceId}`]?.name || '服务详情')
+          : current.viewType === VIEW_TYPES.MANAGEMENT_DETAIL ? (mockManageGroups.find((group) => group.id === current.groupId)?.label || '设置详情')
+            : current.viewType === VIEW_TYPES.MANAGEMENT ? '管理与设置' : ''
 
   return (
     <div className="v2-shell" data-testid="app-shell">
@@ -428,7 +464,9 @@ export default function AppShell({ initialView = 'chat' }) {
 
         {contextView && (
           <aside className="v2-right open" data-testid="right-workspace">
-            {contextView}
+            <WorkspaceFrame title={workspaceTitle} onBack={back} onClose={goChat}>
+              {contextView}
+            </WorkspaceFrame>
           </aside>
         )}
       </div>

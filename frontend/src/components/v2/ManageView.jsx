@@ -2,7 +2,7 @@
 // 每组最多三层；每个详情都有返回；从哪里进入，完成后回到哪里。
 import { mockManageGroups } from '../../fixtures/mock/index.js'
 
-export default function ManageView({ onBack, onOpenGroup }) {
+export default function ManageView({ onOpenGroup }) {
   return (
     <div className="v2-block v2-manage" data-testid="manage-view">
       <div className="v2-block-head">
@@ -10,7 +10,6 @@ export default function ManageView({ onBack, onOpenGroup }) {
           <div className="v2-block-kicker">管理与设置</div>
           <div className="v2-muted">低频入口，按分组进入，逐层返回</div>
         </div>
-        <button className="v2-link" onClick={onBack}>返回对话</button>
       </div>
       <div className="v2-index-list">
         {mockManageGroups.map((g) => (

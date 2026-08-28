@@ -141,7 +141,7 @@
 
 ```bash
 # 运行（合并版单端口）
-cd /Users/zzymima0000/Desktop/个人项目-商家记事本
+cd /path/to/merchant-notebook
 ./start-merged.sh
 
 # 测试

@@ -14,7 +14,7 @@ const SECTIONS = [
   { key: 'history', label: '账本历史' },
 ]
 
-export default function CustomerRecordCard({ record, onBackToList, onOpenService }) {
+export default function CustomerRecordCard({ record, onOpenService }) {
   const [active, setActive] = useState('overview')
 
   if (!record) return null
@@ -37,9 +37,6 @@ export default function CustomerRecordCard({ record, onBackToList, onOpenService
 
   return (
     <div className="v2-block v2-record" data-testid="customer-record-card">
-      <div className="v2-path">
-        <button className="v2-link" onClick={onBackToList}>← 返回客户列表</button>
-      </div>
       <div className="v2-record-head">
         <span className="v2-avatar">{record.display_name.slice(0, 1)}</span>
         <div>
@@ -82,7 +79,7 @@ export default function CustomerRecordCard({ record, onBackToList, onOpenService
       {active === 'services' && (
         <div className="v2-section">
           {services.map((s) => (
-            <button key={s.id} className="v2-candidate" onClick={() => onOpenService?.(s.id)}>
+            <button key={s.id} className="v2-candidate" aria-label={`查看 ${s.name} 服务详情`} onClick={() => onOpenService?.(s.id)}>
               <span className="v2-candidate-main">
                 <strong>{s.name}</strong>
                 <span>最近 {s.last_consumed_at} · {s.total_remaining_count != null ? `剩${s.total_remaining_count}次` : '单次'}</span>

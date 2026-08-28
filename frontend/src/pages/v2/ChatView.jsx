@@ -209,6 +209,13 @@ export default function ChatView({ draftInput, onDraftChange, onAuthoritativeWri
 
   return (
     <div className="v2-chat" data-testid="chat-view">
+      <header className="v2-chat-head">
+        <div>
+          <h2>经营对话</h2>
+          <p>记账、查客户、做跟进，都可以直接告诉我</p>
+        </div>
+        <span className="v2-local-badge"><i aria-hidden="true" />本地工作台</span>
+      </header>
       <div className="v2-chat-scroll">
         {hasMore && <button className="v2-link v2-load-earlier" onClick={loadEarlier}>加载更早消息</button>}
         {pending.length > 0 && <div className="v2-pending-banner">有 {pending.length} 项未完成确认，可跨日继续或放弃</div>}

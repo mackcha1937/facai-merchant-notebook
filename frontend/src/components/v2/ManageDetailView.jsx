@@ -31,7 +31,7 @@ const GROUP_DETAIL = {
   },
 }
 
-export default function ManageDetailView({ group, onBack, products = [], onCreateProduct, onMergeProducts, knowledgeStatus, knowledge = [], recommendationStatus }) {
+export default function ManageDetailView({ group, products = [], onCreateProduct, onMergeProducts, knowledgeStatus, knowledge = [], recommendationStatus }) {
   const detail = GROUP_DETAIL[group?.id] || GROUP_DETAIL.products_services
   const [draft, setDraft] = useState({ canonical_name: '', brand: '', specification: '' })
   const [merge, setMerge] = useState({ source_product_id: '', target_product_id: '' })
@@ -52,7 +52,6 @@ export default function ManageDetailView({ group, onBack, products = [], onCreat
     }
     return (
       <div className="v2-block v2-manage" data-testid="manage-detail-view">
-        <div className="v2-path"><button className="v2-link" onClick={onBack}>← 返回管理与设置</button></div>
         <div className="v2-record-title">产品与服务</div>
         {error && <p className="v2-inline-error">{error}</p>}
         <div className="v2-section">
@@ -90,7 +89,6 @@ export default function ManageDetailView({ group, onBack, products = [], onCreat
     }
     return (
       <div className="v2-block v2-manage" data-testid="manage-detail-view">
-        <div className="v2-path"><button className="v2-link" onClick={onBack}>← 返回管理与设置</button></div>
         <div className="v2-record-title">{detail.title}</div>
         <div className="v2-kv"><span className="k">知识完整</span><span className="v">{status.knowledge_complete_count} 个当前版本</span></div>
         <div className="v2-kv"><span className="k">Embedding</span><span className="v">{status.embedding.status} · 已索引 {status.embedding.indexed} · 失败 {status.embedding.failed}</span></div>
@@ -112,7 +110,6 @@ export default function ManageDetailView({ group, onBack, products = [], onCreat
 
   return (
     <div className="v2-block v2-manage" data-testid="manage-detail-view">
-      <div className="v2-path"><button className="v2-link" onClick={onBack}>← 返回管理与设置</button></div>
       <div className="v2-record-title">{detail.title}</div>
       {detail.rows.map(([k, v]) => (
         <div key={k} className="v2-kv"><span className="k">{k}</span><span className="v">{v}</span></div>

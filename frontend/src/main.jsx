@@ -6,6 +6,7 @@ import './index.css'
 import './styles/tokens.css'
 import './styles/global.css'
 import './styles/stage2.css'
+import './styles/landing.css'
 // v1.0 页面
 import ChatHome from './pages/v1/ChatHome.jsx'
 import VerifyStage0 from './pages/v1/VerifyStage0.jsx'
@@ -25,6 +26,7 @@ import VerifyV2Stage8 from './pages/v2/VerifyV2Stage8.jsx'
 import AdminKnowledge from './pages/v2/AdminKnowledge.jsx'
 import AdminEvaluations from './pages/v2/AdminEvaluations.jsx'
 import AppShell from './pages/v2/AppShell.jsx'
+import ProductHome from './pages/v2/ProductHome.jsx'
 import CustomerSheet from './pages/v1/CustomerSheet.jsx'
 import Settings from './pages/v1/Settings.jsx'
 import PromptSettings from './pages/v1/PromptSettings.jsx'
@@ -33,7 +35,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<ChatHome />} />
+        <Route path="/" element={<ProductHome />} />
         <Route path="/customers" element={<CustomerSheet />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/verify/stage-0" element={<VerifyStage0 />} />
