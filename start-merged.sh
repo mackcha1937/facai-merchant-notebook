@@ -12,6 +12,7 @@ npm run build
 
 echo "==> 启动合并服务（前端已由后端托管）..."
 cd "$ROOT/backend"
+.venv/bin/alembic upgrade head
 lsof -ti :"$BACKEND_PORT" 2>/dev/null | xargs kill 2>/dev/null || true
 sleep 1
 nohup .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port "$BACKEND_PORT" \

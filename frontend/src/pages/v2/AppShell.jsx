@@ -209,6 +209,9 @@ export default function AppShell({ initialView = 'chat' }) {
     pushView(VIEW_TYPES.CUSTOMER_SERVICE_DETAIL, { customerId, serviceId })
   }, [pushView])
   const openManageGroup = useCallback((groupId) => pushView(VIEW_TYPES.MANAGEMENT_DETAIL, { groupId }), [pushView])
+  const logout = useCallback(async () => {
+    try { await api.logout() } finally { window.location.assign('/login') }
+  }, [])
 
   // ---- 返回（统一顺序，按钮/浏览器返回一致） ----
   const back = useCallback(() => {
@@ -448,7 +451,7 @@ export default function AppShell({ initialView = 'chat' }) {
       />
 
       <div className="v2-shell-body">
-        <LeftNav active={activeKey} onNavigate={navigateTo} />
+        <LeftNav active={activeKey} onNavigate={navigateTo} onLogout={logout} />
 
         <main className="v2-center">
           <h1 className="v2-sr-only">发财客户管理工作台</h1>
@@ -471,7 +474,7 @@ export default function AppShell({ initialView = 'chat' }) {
         )}
       </div>
 
-      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} onNavigate={navigateTo} active={activeKey} />
+      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} onNavigate={navigateTo} active={activeKey} onLogout={logout} />
     </div>
   )
 }

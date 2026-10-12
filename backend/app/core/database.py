@@ -1,4 +1,4 @@
-"""SQLite 连接与会话管理。"""
+"""SQLite / PostgreSQL 连接与会话管理。"""
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker
 
@@ -23,13 +23,14 @@ def _ensure_data_dir() -> None:
 def get_engine():
     global _engine
     if _engine is None:
-        _ensure_data_dir()
         settings = get_settings()
-        _engine = create_engine(
-            settings.effective_database_url,
-            connect_args={"check_same_thread": False},
-        )
-        event.listen(_engine, "connect", _enable_sqlite_fk)
+        url = settings.effective_database_url
+        connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
+        if url.startswith("sqlite"):
+            _ensure_data_dir()
+        _engine = create_engine(url, connect_args=connect_args, pool_pre_ping=True)
+        if url.startswith("sqlite"):
+            event.listen(_engine, "connect", _enable_sqlite_fk)
     return _engine
 
 
@@ -55,10 +56,14 @@ def get_db():
 
 
 def init_db() -> None:
-    """创建所有表（阶段1开始使用）。"""
+    """本地可自动创建；生产只做连通性检查，结构由 Alembic 管理。"""
     from app.infrastructure import models  # noqa: F401
 
-    models.Base.metadata.create_all(bind=get_engine())
+    if get_settings().auto_create_schema:
+        models.Base.metadata.create_all(bind=get_engine())
+    else:
+        with get_engine().connect() as connection:
+            connection.execute(text("SELECT 1"))
 
 
 def check_database_connection() -> tuple[bool, str]:

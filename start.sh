@@ -10,6 +10,7 @@ BACKEND_PORT="${BACKEND_PORT:-8000}"
 
 echo "==> 启动后端（端口 ${BACKEND_PORT}）"
 cd "$ROOT/backend"
+.venv/bin/alembic upgrade head
 nohup .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port "$BACKEND_PORT" \
   > /tmp/beauty-backend.log 2>&1 &
 echo $! > "$ROOT/backend/.backend.pid"

@@ -5,6 +5,8 @@
 // - 语音与文字最终走同一处理函数（send），不绕过确认；
 // - 网络失败/转写失败保留错误与可编辑文本，可原地重试。
 
+import { csrfHeaders } from '../api.js'
+
 export const SPEECH_STATES = {
   IDLE: 'idle',
   RECORDING: 'recording',
@@ -16,7 +18,8 @@ export const SPEECH_STATES = {
 export async function apiTranscribe(utterance, scenario = 'success') {
   const res = await fetch('/api/v2/stage2/mock-speech', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', ...csrfHeaders() },
     body: JSON.stringify({ utterance, scenario }),
   })
   if (!res.ok) {

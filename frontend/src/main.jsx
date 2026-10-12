@@ -27,37 +27,42 @@ import AdminKnowledge from './pages/v2/AdminKnowledge.jsx'
 import AdminEvaluations from './pages/v2/AdminEvaluations.jsx'
 import AppShell from './pages/v2/AppShell.jsx'
 import ProductHome from './pages/v2/ProductHome.jsx'
+import LoginPage from './pages/v2/LoginPage.jsx'
+import AuthGate from './components/v2/AuthGate.jsx'
 import CustomerSheet from './pages/v1/CustomerSheet.jsx'
 import Settings from './pages/v1/Settings.jsx'
 import PromptSettings from './pages/v1/PromptSettings.jsx'
+
+const protectedPage = (page) => <AuthGate>{page}</AuthGate>
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<ProductHome />} />
-        <Route path="/customers" element={<CustomerSheet />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/verify/stage-0" element={<VerifyStage0 />} />
-        <Route path="/verify/stage-1" element={<VerifyStage1 />} />
-        <Route path="/verify/stage-2" element={<VerifyStage2 />} />
-        <Route path="/verify/stage-3" element={<VerifyStage3 />} />
-        <Route path="/verify/stage-4" element={<VerifyStage4 />} />
-        <Route path="/verify/v2-stage-0" element={<VerifyV2Stage0 />} />
-        <Route path="/verify/v2-stage-1" element={<VerifyV2Stage1 />} />
-        <Route path="/verify/v2-stage-2" element={<VerifyV2Stage2 />} />
-        <Route path="/verify/v2-stage-3" element={<VerifyV2Stage3 />} />
-        <Route path="/verify/v2-stage-4" element={<VerifyV2Stage4 />} />
-        <Route path="/verify/v2-stage-5" element={<VerifyV2Stage5 />} />
-        <Route path="/verify/v2-stage-6" element={<VerifyV2Stage6 />} />
-        <Route path="/verify/v2-stage-7" element={<VerifyV2Stage7 />} />
-        <Route path="/verify/v2-stage-8" element={<VerifyV2Stage8 />} />
-        <Route path="/admin/knowledge" element={<AdminKnowledge />} />
-        <Route path="/admin/evaluations" element={<AdminEvaluations />} />
-        <Route path="/app/chat" element={<AppShell initialView="chat" />} />
-        <Route path="/app/customers" element={<AppShell initialView="customer_index" />} />
-        <Route path="/app/manage" element={<AppShell initialView="management" />} />
-        <Route path="/settings/prompt" element={<PromptSettings />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/customers" element={protectedPage(<CustomerSheet />)} />
+        <Route path="/settings" element={protectedPage(<Settings />)} />
+        <Route path="/verify/stage-0" element={protectedPage(<VerifyStage0 />)} />
+        <Route path="/verify/stage-1" element={protectedPage(<VerifyStage1 />)} />
+        <Route path="/verify/stage-2" element={protectedPage(<VerifyStage2 />)} />
+        <Route path="/verify/stage-3" element={protectedPage(<VerifyStage3 />)} />
+        <Route path="/verify/stage-4" element={protectedPage(<VerifyStage4 />)} />
+        <Route path="/verify/v2-stage-0" element={protectedPage(<VerifyV2Stage0 />)} />
+        <Route path="/verify/v2-stage-1" element={protectedPage(<VerifyV2Stage1 />)} />
+        <Route path="/verify/v2-stage-2" element={protectedPage(<VerifyV2Stage2 />)} />
+        <Route path="/verify/v2-stage-3" element={protectedPage(<VerifyV2Stage3 />)} />
+        <Route path="/verify/v2-stage-4" element={protectedPage(<VerifyV2Stage4 />)} />
+        <Route path="/verify/v2-stage-5" element={protectedPage(<VerifyV2Stage5 />)} />
+        <Route path="/verify/v2-stage-6" element={protectedPage(<VerifyV2Stage6 />)} />
+        <Route path="/verify/v2-stage-7" element={protectedPage(<VerifyV2Stage7 />)} />
+        <Route path="/verify/v2-stage-8" element={protectedPage(<VerifyV2Stage8 />)} />
+        <Route path="/admin/knowledge" element={protectedPage(<AdminKnowledge />)} />
+        <Route path="/admin/evaluations" element={protectedPage(<AdminEvaluations />)} />
+        <Route path="/app/chat" element={protectedPage(<AppShell initialView="chat" />)} />
+        <Route path="/app/customers" element={protectedPage(<AppShell initialView="customer_index" />)} />
+        <Route path="/app/manage" element={protectedPage(<AppShell initialView="management" />)} />
+        <Route path="/settings/prompt" element={protectedPage(<PromptSettings />)} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>,

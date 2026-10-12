@@ -16,8 +16,14 @@ REPORT_PATH = ROOT / "v2.0" / "stage-8-delivery" / "test-results.json"
 def _database_health(db: Session) -> dict:
     try:
         migration = db.execute(text("SELECT version_num FROM alembic_version")).scalar_one_or_none()
-        integrity = db.execute(text("PRAGMA integrity_check")).scalar_one_or_none()
-        foreign_key_errors = len(db.execute(text("PRAGMA foreign_key_check")).all())
+        if db.bind and db.bind.dialect.name == "sqlite":
+            integrity = db.execute(text("PRAGMA integrity_check")).scalar_one_or_none()
+            foreign_key_errors = len(db.execute(text("PRAGMA foreign_key_check")).all())
+        else:
+            # PostgreSQL 在每条写入时强制外键；最小健康检查不执行 SQLite PRAGMA。
+            db.execute(text("SELECT 1"))
+            integrity = "ok"
+            foreign_key_errors = 0
         return {
             "migration": migration or "unknown",
             "integrity": integrity or "unknown",
@@ -60,7 +66,7 @@ def status(db: Session) -> dict:
             "external_embedding": False,
             "external_message_send": False,
             "public_deployment": False,
-            "production_authentication": False,
+            "production_authentication": True,
             "local_dev_identity": settings.local_dev_owner_enabled,
         },
         "test_results": report,

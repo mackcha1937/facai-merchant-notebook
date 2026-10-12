@@ -2,7 +2,7 @@
 import { DRAWER_ITEMS } from './Drawer.jsx'
 import Icon from './Icons.jsx'
 
-export default function LeftNav({ active, onNavigate }) {
+export default function LeftNav({ active, onNavigate, onLogout }) {
   return (
     <aside className="v2-left-nav" data-testid="left-nav">
       <a className="v2-left-brand" href="/" aria-label="发财产品首页">
@@ -25,6 +25,7 @@ export default function LeftNav({ active, onNavigate }) {
         <i aria-hidden="true"><Icon name="home" size={20} /></i>
         <span>返回产品首页</span>
       </a>
+      <button className="v2-left-logout" type="button" onClick={onLogout}>退出登录</button>
     </aside>
   )
 }

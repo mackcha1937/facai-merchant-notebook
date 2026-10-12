@@ -47,7 +47,7 @@ def test_stage8_status_is_sanitized_honest_and_owner_readable(client, monkeypatc
     assert body["runtime_boundaries"]["external_embedding"] is False
     assert body["runtime_boundaries"]["external_message_send"] is False
     assert body["runtime_boundaries"]["public_deployment"] is False
-    assert body["runtime_boundaries"]["production_authentication"] is False
+    assert body["runtime_boundaries"]["production_authentication"] is True
     serialized = json.dumps(body).lower()
     assert "deepseek_api_key" not in serialized and "sk-" not in serialized
 
@@ -63,8 +63,8 @@ def test_stage8_status_fails_closed_without_identity_context(client, monkeypatch
     set_current_tenant_id(None); set_current_owner_id(None); set_current_role(None)
     monkeypatch.setattr(get_settings(), "local_dev_owner_enabled", False)
     response = client.get("/api/v2-stage8/status")
-    assert response.status_code == 400
-    assert "缺少" in response.json()["detail"]
+    assert response.status_code == 401
+    assert response.json()["detail"] == "请先登录"
 
 
 def test_sqlite_online_backup_restore_digest_integrity_and_no_overwrite(tmp_path):
@@ -80,7 +80,7 @@ def test_sqlite_online_backup_restore_digest_integrity_and_no_overwrite(tmp_path
 
     result = restore_and_verify(source, restored)
     assert result["status"] == "通过"
-    assert result["migration"] == "0020_stage7_evaluation_release"
+    assert result["migration"] == "0021_pilot_auth_production"
     assert result["integrity"] == "ok" and result["foreign_key_errors"] == 0
     assert result["source_digest"] == result["restored_digest"]
     with pytest.raises(FileExistsError, match="拒绝覆盖"):

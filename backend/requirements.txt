@@ -3,5 +3,7 @@ uvicorn>=0.29,<1.0
 pydantic>=2.6,<3.0
 pydantic-settings>=2.2,<3.0
 sqlalchemy>=2.0,<3.0
+alembic>=1.13,<2.0
 httpx>=0.27,<1.0
 jsonschema>=4.18,<5.0
+psycopg[binary]>=3.2,<4.0

@@ -163,7 +163,7 @@ def test_no_role_confirm_fails(monkeypatch):
     monkeypatch.setattr(config_module.get_settings(), "local_dev_owner_enabled", False)
     set_current_role(None)
     c = TestClient(app)
-    assert c.post("/api/agent/interpret", json={"text": "小蓝"}).status_code == 400
+    assert c.post("/api/agent/interpret", json={"text": "小蓝"}).status_code == 401
 
 
 # ---------- 四、回滚一致性 head -> 0008 -> head ----------
@@ -226,7 +226,7 @@ def test_product_unique_constraint_behavior(tmp_path):
     assert idx is not None, "0014 应创建 uq_products_tenant_name 部分唯一索引"
 
     # 准备租户2（默认只回填租户1）
-    conn.execute("INSERT INTO tenants (id, display_name, status, created_at, updated_at) VALUES (2, 'B店', 'active', datetime('now'), datetime('now'))")
+    conn.execute("INSERT INTO tenants (id, slug, display_name, status, created_at, updated_at) VALUES (2, 'b-shop', 'B店', 'active', datetime('now'), datetime('now'))")
 
     # 同租户同名未删除 → 拒绝
     conn.execute("INSERT INTO products (tenant_id, canonical_name, lifecycle_status, knowledge_status, version, created_at, updated_at) VALUES (1, '面膜', 'draft', 'incomplete', 1, datetime('now'), datetime('now'))")
@@ -263,8 +263,8 @@ def test_model_status_fail_closed_without_context(monkeypatch):
     set_current_role(None)
     c = TestClient(app)
     resp = c.get("/api/config/model-status")
-    assert resp.status_code == 400
-    assert "缺少用户上下文" in resp.json()["detail"]
+    assert resp.status_code == 401
+    assert resp.json()["detail"] == "请先登录"
 
 
 # ---------- 八、0008 双数据库完整结构对比 ----------

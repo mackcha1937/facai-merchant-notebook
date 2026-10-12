@@ -1,0 +1,39 @@
+{
+  "date": "2026-10-12",
+  "status": "local_ready_cloud_pending",
+  "backend": {
+    "passed": 297,
+    "failed": 0
+  },
+  "frontend": {
+    "files_passed": 13,
+    "tests_passed": 64,
+    "failed": 0
+  },
+  "production_build": {
+    "status": "passed",
+    "modules": 89
+  },
+  "migration": "0021_pilot_auth_production",
+  "migration_roundtrip": {
+    "status": "passed",
+    "core_digest_before": "81531d86f2240f7f54246f3abb28978c772c7c19974822cf6eb3015052ba580b",
+    "core_digest_after": "81531d86f2240f7f54246f3abb28978c772c7c19974822cf6eb3015052ba580b",
+    "integrity": "ok",
+    "foreign_key_errors": 0
+  },
+  "browser_smoke": {
+    "desktop_width": 1440,
+    "mobile_width": 390,
+    "login_and_invite_forms": "passed",
+    "horizontal_overflow": false,
+    "secret_exposure": false
+  },
+  "external_calls": {
+    "deepseek": 0,
+    "embedding": 0,
+    "messages": 0,
+    "cloud_resource_writes": 0
+  },
+  "public_url": null
+}

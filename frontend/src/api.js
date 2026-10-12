@@ -1,8 +1,26 @@
 // 后端 API 调用封装（通过 Vite 代理访问，相对路径）
+function readCookie(name) {
+  const prefix = `${encodeURIComponent(name)}=`
+  const row = document.cookie.split('; ').find((item) => item.startsWith(prefix))
+  return row ? decodeURIComponent(row.slice(prefix.length)) : ''
+}
+
+export function csrfHeaders() {
+  const token = readCookie('facai_csrf')
+  return token ? { 'X-CSRF-Token': token } : {}
+}
+
 async function request(path, options = {}) {
+  const method = (options.method || 'GET').toUpperCase()
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(method === 'GET' || method === 'HEAD' ? {} : csrfHeaders()),
+    ...(options.headers || {}),
+  }
   const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    credentials: 'same-origin',
+    headers,
   })
   if (!res.ok) {
     let detail = `请求失败（HTTP ${res.status}）`
@@ -23,6 +41,10 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  getAuthMe: () => request('/api/auth/me'),
+  login: (data) => request('/api/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+  redeemInvite: (data) => request('/api/auth/redeem', { method: 'POST', body: JSON.stringify(data) }),
+  logout: () => request('/api/auth/logout', { method: 'POST' }),
   // 阶段3持续主会话与统一 Proposal
   getMainThread: () => request('/api/owner/chat/thread'),
   getChatHistory: ({ before, limit = 30 } = {}) => {
@@ -34,7 +56,8 @@ export const api = {
   sendChatTurn: (data) => request('/api/owner/chat/turn', { method: 'POST', body: JSON.stringify(data) }),
   streamChatTurn: async (data, onEvent = () => {}) => {
     const res = await fetch('/api/owner/chat/turn/stream', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', ...csrfHeaders() }, body: JSON.stringify(data),
     })
     if (!res.ok) {
       let payload = null

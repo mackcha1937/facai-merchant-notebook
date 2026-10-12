@@ -14,7 +14,8 @@ depends_on = None
 
 def upgrade() -> None:
     bind = op.get_bind()
-    bind.exec_driver_sql("PRAGMA foreign_keys=OFF")
+    if bind.dialect.name == "sqlite":
+        bind.exec_driver_sql("PRAGMA foreign_keys=OFF")
 
     # 1. 去重：同名同租户的 Product 草稿合并，保留最小 id
     bind.exec_driver_sql(
@@ -48,7 +49,8 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     bind = op.get_bind()
-    bind.exec_driver_sql("PRAGMA foreign_keys=OFF")
+    if bind.dialect.name == "sqlite":
+        bind.exec_driver_sql("PRAGMA foreign_keys=OFF")
     # 删除 product_id 索引
     op.drop_index("ix_ledger_product_id", table_name="ledger_entries")
     # 明确删除 fk_ledger_product 外键（batch 重建移除）

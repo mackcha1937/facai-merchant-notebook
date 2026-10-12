@@ -8,7 +8,7 @@ export const DRAWER_ITEMS = [
   { key: 'management', label: '管理与设置', icon: 'settings' },
 ]
 
-export default function Drawer({ open, onClose, onNavigate, active }) {
+export default function Drawer({ open, onClose, onNavigate, active, onLogout }) {
   if (!open) return null
   return (
     <div className="v2-drawer" data-testid="drawer">
@@ -32,6 +32,7 @@ export default function Drawer({ open, onClose, onNavigate, active }) {
           <i aria-hidden="true"><Icon name="home" size={20} /></i>
           <span>返回产品首页</span>
         </a>
+        <button className="v2-drawer-logout" type="button" onClick={onLogout}>退出登录</button>
       </nav>
     </div>
   )

@@ -5,6 +5,7 @@ down_revision: 0010_product_name_migration
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 revision = "0011_tenant_fk_completion"
 down_revision = "0010_product_name_migration"
@@ -37,7 +38,8 @@ MISSING_TENANT_FK = [
 
 def upgrade() -> None:
     bind = op.get_bind()
-    bind.exec_driver_sql("PRAGMA foreign_keys=OFF")
+    if bind.dialect.name == "sqlite":
+        bind.exec_driver_sql("PRAGMA foreign_keys=OFF")
 
     # 1. 18 张表补 tenant 外键 + 索引
     for table in MISSING_TENANT_FK:
@@ -46,9 +48,27 @@ def upgrade() -> None:
         op.create_index(f"ix_{table}_tenant_id", table, ["tenant_id"])
 
     # 2. 清理重复父级外键（手动重建 3 张表，只保留正确外键）
-    _rebuild_packages(bind)
-    _rebuild_ledger(bind)
-    _rebuild_customer_aliases(bind)
+    if bind.dialect.name == "sqlite":
+        _rebuild_packages(bind)
+        _rebuild_ledger(bind)
+        _rebuild_customer_aliases(bind)
+    else:
+        # PostgreSQL 不允许沿用 SQLite 的手工建表/改名方式；保留每组关系中的
+        # 一个约束并移除 0001 与 0009 叠加产生的重复外键。
+        _drop_duplicate_foreign_keys(bind, "packages")
+        _drop_duplicate_foreign_keys(bind, "ledger_entries")
+        _drop_duplicate_foreign_keys(bind, "customer_aliases")
+
+
+def _drop_duplicate_foreign_keys(bind, table):
+    seen = set()
+    for fk in inspect(bind).get_foreign_keys(table):
+        key = (tuple(fk.get("constrained_columns") or ()), fk.get("referred_table"))
+        name = fk.get("name")
+        if key in seen and name:
+            op.drop_constraint(name, table, type_="foreignkey")
+        else:
+            seen.add(key)
 
 
 def _rebuild_packages(bind):
@@ -142,7 +162,8 @@ def _rebuild_customer_aliases(bind):
 
 def downgrade() -> None:
     bind = op.get_bind()
-    bind.exec_driver_sql("PRAGMA foreign_keys=OFF")
+    if bind.dialect.name == "sqlite":
+        bind.exec_driver_sql("PRAGMA foreign_keys=OFF")
     # 撤销 0011 新增的 18 表 tenant 外键 + 索引
     for table in MISSING_TENANT_FK:
         op.drop_index(f"ix_{table}_tenant_id", table_name=table)

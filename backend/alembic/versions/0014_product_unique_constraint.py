@@ -14,7 +14,8 @@ depends_on = None
 
 def upgrade() -> None:
     bind = op.get_bind()
-    bind.exec_driver_sql("PRAGMA foreign_keys=OFF")
+    if bind.dialect.name == "sqlite":
+        bind.exec_driver_sql("PRAGMA foreign_keys=OFF")
 
     # 1. trim 标准化
     bind.exec_driver_sql(
@@ -54,5 +55,6 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     bind = op.get_bind()
-    bind.exec_driver_sql("PRAGMA foreign_keys=OFF")
+    if bind.dialect.name == "sqlite":
+        bind.exec_driver_sql("PRAGMA foreign_keys=OFF")
     op.execute("DROP INDEX IF EXISTS uq_products_tenant_name")

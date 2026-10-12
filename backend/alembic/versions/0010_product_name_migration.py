@@ -24,7 +24,7 @@ def upgrade() -> None:
         sa.text(
             """
             INSERT INTO products (tenant_id, canonical_name, lifecycle_status, knowledge_status, version, created_at, updated_at)
-            SELECT e.tenant_id, e.product_name, 'draft', 'incomplete', 1, datetime('now'), datetime('now')
+            SELECT e.tenant_id, e.product_name, 'draft', 'incomplete', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
             FROM ledger_entries e
             WHERE e.product_name IS NOT NULL AND e.product_name != ''
               AND NOT EXISTS (

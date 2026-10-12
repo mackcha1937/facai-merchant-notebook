@@ -54,3 +54,15 @@ def set_current_role(role: str | None):
 
 def set_current_owner_id(owner_id: int | None):
     return _current_user_id.set(owner_id)
+
+
+def reset_current_tenant_id(token) -> None:
+    _current_tenant_id.reset(token)
+
+
+def reset_current_role(token) -> None:
+    _current_user_role.reset(token)
+
+
+def reset_current_owner_id(token) -> None:
+    _current_user_id.reset(token)
